@@ -31,13 +31,12 @@ read createADGroup
         --role "Azure Kubernetes Service Cluster User Role" \
         --scope $AKS_ID
         RoleName="$ADGroup-full-access"
-        sed -i RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g"
-        kubectl create -f RoleFullAccess.yaml
-        sed -i RoleBinding.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/rolebindingnamehehe/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g"
-        kubectl create -f RoleBinding.yaml
-
+        rnd= $RANDOM
+        sed -i ./RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleFullAccess-$rnd.yaml
+        kubectl create -f ./RoleFullAccess-$rnd.yaml
+        sed -i ./RoleBinding.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/rolebindingnamehehe/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBinding-$rnd.yaml
+        kubectl create -f ./RoleBinding-$rnd.yaml
         echo -e "$GREEN group $ADGroup has been assign to namespace $NSName."
-
     else
         echo -e "$GREEN What is the name of the new AD Group?"
         read ADNEWGroup
@@ -53,12 +52,13 @@ read createADGroup
         --role "Azure Kubernetes Service Cluster User Role" \
         --scope $AKS_ID
 
-        echo -e "$GREEN Creating Role 
-        RoleName="$ADGroup-full-access"
-        sed -i RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g"
-        kubectl create -f RoleFullAccess.yaml
-        sed -i RoleBinding.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/rolebindingnamehehe/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g"
-        kubectl create -f RoleBinding.yaml
+        echo -e "$GREEN Creating Role"
+        RoleName= "$ADGroup-full-access"
+        rnd= $RANDOM
+        sed -i ./RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleFullAccess-$rnd.yaml
+        kubectl create -f ./RoleFullAccess-$rnd.yaml
+        sed -i ./RoleBinding.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/rolebindingnamehehe/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBinding-$rnd.yaml
+        kubectl create -f ./RoleBinding-$rnd.yaml
         echo -e "$GREEN group $ADGroup has been assign to namespace $NSName."
     fi
 
