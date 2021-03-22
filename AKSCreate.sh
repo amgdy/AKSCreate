@@ -1,4 +1,4 @@
-GREEN= "\033[0;32m"
+GREEN="\033[0;32m"
 echo -e "$GREEN Hi!, This script will help you create Azure Kubernetes Services"
 echo -e "$GREEN These are the prerequisistes needed:"
 echo -e "$GREEN - Global Admin Permission on ADD"
