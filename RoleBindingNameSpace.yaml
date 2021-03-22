@@ -9,5 +9,5 @@ roleRef:
   name: ROLENAME
 subjects:
 - kind: Group
-  namespace: NAMESPACE
+  namespace: NAMESPACENAME
   name: groupObjectId
