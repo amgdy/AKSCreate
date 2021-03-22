@@ -148,10 +148,12 @@ if [ $addAdmin == "y" ]
 then
 echo -e "$GREEN Adding Current user As Admin Role"
 SIGNED_USER=$(az ad signed-in-user show --query objectId -o tsv)
+rnd= $RANDOM
 sed ./aad-user-cluster-admin-binding.yaml \
     -e s/USEROBJECTID/$SIGNED_USER/g \
-    > ./aad-user-cluster-admin-binding-updated.yaml
+    -e s/aks-cluster-admins/$rnd-cluster-admins \
+    > ./aad-user-cluster-admin-binding-$rnd.yaml
 echo -e "$GREEN Now granting the signed in account a cluster admin rights..."
-kubectl apply -f ./deployments/aad-user-cluster-admin-binding-updated.yaml
+kubectl apply -f ./aad-user-cluster-admin-binding-$rnd.yaml
 else
 fi
