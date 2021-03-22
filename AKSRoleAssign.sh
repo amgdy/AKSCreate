@@ -32,9 +32,9 @@ then
             --scope $AKS_ID
             RoleName="$ADGroup-full-access"
             rnd=$RANDOM
-            sed -i ./RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleFullAccess-$rnd.yaml
+            sed ./RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleFullAccess-$rnd.yaml
             kubectl create -f ./RoleFullAccess-$rnd.yaml
-            sed -i ./RoleBindingNameSpace.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/$ADGroup-$NSName-Access/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBindingNameSpace-$rnd.yaml
+            sed ./RoleBindingNameSpace.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/$ADGroup-$NSName-Access/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBindingNameSpace-$rnd.yaml
             kubectl create -f ./RoleBindingNameSpace-$rnd.yaml
             echo -e "$GREEN group $ADGroup has been assign to namespace $NSName."
         else
@@ -55,9 +55,9 @@ then
             echo -e "$GREEN Creating Role"
             RoleName="$ADGroup-full-access"
             rnd=$RANDOM
-            sed -i ./RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleFullAccess-$rnd.yaml
+            sed ./RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleFullAccess-$rnd.yaml
             kubectl create -f ./RoleFullAccess-$rnd.yaml
-            sed -i ./RoleBindingNameSpace.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/$ADGroup-$NSName-Access/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBindingNameSpace-$rnd.yaml
+            sed ./RoleBindingNameSpace.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/$ADGroup-$NSName-Access/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBindingNameSpace-$rnd.yaml
             kubectl create -f ./RoleBindingNameSpace-$rnd.yaml
             echo -e "$GREEN group $ADGroup has been assign to namespace $NSName."
         fi
