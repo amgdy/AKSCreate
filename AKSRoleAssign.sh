@@ -31,7 +31,7 @@ read createADGroup
         --role "Azure Kubernetes Service Cluster User Role" \
         --scope $AKS_ID
         RoleName="$ADGroup-full-access"
-        rnd= $RANDOM
+        rnd=$RANDOM
         sed -i ./RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleFullAccess-$rnd.yaml
         kubectl create -f ./RoleFullAccess-$rnd.yaml
         sed -i ./RoleBinding.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/rolebindingnamehehe/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBinding-$rnd.yaml
@@ -53,8 +53,8 @@ read createADGroup
         --scope $AKS_ID
 
         echo -e "$GREEN Creating Role"
-        RoleName= "$ADGroup-full-access"
-        rnd= $RANDOM
+        RoleName="$ADGroup-full-access"
+        rnd=$RANDOM
         sed -i ./RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleFullAccess-$rnd.yaml
         kubectl create -f ./RoleFullAccess-$rnd.yaml
         sed -i ./RoleBinding.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/rolebindingnamehehe/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBinding-$rnd.yaml
