@@ -1,0 +1,13 @@
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: ROLEBINDINGNAME
+  namespace: NAMESPACENAME
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ROLENAME
+subjects:
+- kind: Group
+  namespace: NAMESPACE
+  name: groupObjectId
