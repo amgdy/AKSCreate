@@ -34,8 +34,8 @@ then
             rnd=$RANDOM
             sed -i ./RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleFullAccess-$rnd.yaml
             kubectl create -f ./RoleFullAccess-$rnd.yaml
-            sed -i ./RoleBinding.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/rolebindingnamehehe/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBinding-$rnd.yaml
-            kubectl create -f ./RoleBinding-$rnd.yaml
+            sed -i ./RoleBindingNameSpace.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/$ADGroup-$NSName-Access/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBindingNameSpace-$rnd.yaml
+            kubectl create -f ./RoleBindingNameSpace-$rnd.yaml
             echo -e "$GREEN group $ADGroup has been assign to namespace $NSName."
         else
             echo -e "$GREEN What is the name of the new AD Group?"
@@ -57,8 +57,8 @@ then
             rnd=$RANDOM
             sed -i ./RoleFullAccess.yaml -e "s/ROLENAME/$ROLEName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleFullAccess-$rnd.yaml
             kubectl create -f ./RoleFullAccess-$rnd.yaml
-            sed -i ./RoleBinding.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/rolebindingnamehehe/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBinding-$rnd.yaml
-            kubectl create -f ./RoleBinding-$rnd.yaml
+            sed -i ./RoleBindingNameSpace.yaml -e "s/groupObjectId/${GROUP_ID}/g" -e "s/ROLEBINDINGNAME/$ADGroup-$NSName-Access/g" -e "s/ROLENAME/$RoleName/g" -e "s/NAMESPACENAME/$NSName/g" > ./RoleBindingNameSpace-$rnd.yaml
+            kubectl create -f ./RoleBindingNameSpace-$rnd.yaml
             echo -e "$GREEN group $ADGroup has been assign to namespace $NSName."
         fi
 else
