@@ -1,4 +1,4 @@
-GREEN= "\033[0;32m"
+GREEN="\033[0;32m"
 echo -e "$GREEN What is the AKS Resource Group ?"
 read ResourceGroup
 echo -e "$GREEN What is the AKS Name ?"
