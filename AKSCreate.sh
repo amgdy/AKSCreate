@@ -148,7 +148,7 @@ if [ $addAdmin == "y" ]
 then
 echo -e "$GREEN Adding Current user As Admin Role"
 SIGNED_USER=$(az ad signed-in-user show --query objectId -o tsv)
-rnd= $RANDOM
+rnd=$RANDOM
 sed ./aad-user-cluster-admin-binding.yaml \
     -e s/USEROBJECTID/$SIGNED_USER/g \
     -e s/aks-cluster-admins/$rnd-cluster-admins \
