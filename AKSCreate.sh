@@ -25,7 +25,14 @@ echo -e "$GREEN Do you have the subnet Created ? y/n"
 read subnetcreated
 if [ $subnetcreated == 'y' ]
 then
-    echo -e "$GREEN Ok! What is the address-prefix for the subnet ? by example '10.179.128.0/21'"
+       echo -e "$GREEN Getting exisiting subnet..."
+    VNET_ID=$(az network vnet show --resource-group ${vnetrg} --name $vnetname --query id -o tsv)
+    echo export VNET_ID=$VNET_ID >> ./var.txt
+    SUBNET_ID=$(az network vnet subnet show --resource-group ${vnetrg} --vnet-name $vnetname --name $subname --query id -o tsv)
+    echo export SUBNET_ID=$SUBNET_ID >> ./var.txt
+else
+
+ echo -e "$GREEN Ok! What is the address-prefix for the subnet ? by example '10.179.128.0/21'"
     read addressPrefix
     echo -e "$GREEN Creating subnet for AKS cluster..."
     VNET_ID=$(az network vnet show --resource-group ${vnetrg} --name $vnetname --query id -o tsv)
@@ -33,13 +40,7 @@ then
     SUBNET_ID=$(az network vnet subnet create -n aks-subnet -g ${vnetrg} --vnet-name $vnetname --address-prefix $addressPrefix --query "id" -o tsv)
     echo export SUBNET_ID=$SUBNET_ID >> ./var.txt
     echo -e "$GREEN Subnet $SUBNET_ID has been created!..."
-else
-    echo -e "$GREEN Getting exisiting subnet..."
-    VNET_ID=$(az network vnet show --resource-group ${vnetrg} --name $vnetname --query id -o tsv)
-    echo export VNET_ID=$VNET_ID >> ./var.txt
-    SUBNET_ID=$(az network vnet subnet show --resource-group ${vnetrg} --vnet-name $vnetname --name $subname --query id -o tsv)
-    echo export SUBNET_ID=$SUBNET_ID >> ./var.txt
-fi
+    fi
 
 echo -e "$GREEN Create app registration for Server app..."
 
