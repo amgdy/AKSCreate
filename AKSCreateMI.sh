@@ -63,12 +63,6 @@ tenantId=$(az account show --query tenantId -o tsv)
             echo -e "$GREEN AD Group $ADNEWGroup has been created !"
         fi
 
-
-
-read -p "Please allow for 5 seconds for SP propogation and then Press enter to continue.."
-
-sleep 5
-
 echo -e "$GREEN Creating Cluster..."
 echo -e "$GREEN How many nodes you require for the cluster ?"
 read nodecount
