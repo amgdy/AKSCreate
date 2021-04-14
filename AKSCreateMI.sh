@@ -95,9 +95,9 @@ az aks create \
   --dns-service-ip 172.171.0.10 \
   --enable-aad \
   --aad-admin-group-object-ids $GROUP_ID \
-  --aad-tenant-id $tenantId
-  --enable-managed-identity
-	--kubernetes-version $AKSVersion
+  --aad-tenant-id $tenantId \
+  --enable-managed-identity \
+  --kubernetes-version $AKSVersion
 
 echo -e "$GREEN Congratulation AKS Cluster $clusterName has been created!"
 echo -e "$GREEN Logging into Cluster Now..."
