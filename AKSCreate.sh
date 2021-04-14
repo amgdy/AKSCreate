@@ -157,4 +157,5 @@ sed ./aad-user-cluster-admin-binding.yaml \
 echo -e "$GREEN Now granting the signed in account a cluster admin rights..."
 kubectl apply -f ./aad-user-cluster-admin-binding-$rnd.yaml
 else
+  echo -e "$GREEN "
 fi
