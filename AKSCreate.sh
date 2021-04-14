@@ -130,7 +130,7 @@ az aks create \
 echo -e "$GREEN Congratulation AKS Cluster $clusterName has been created!"
 echo -e "$GREEN Logging into Cluster Now..."
 
-az aks get-credentials --name uaen-ien-prod01 --resource-group PROD-IEN-RG01 --overwrite-existing --admin
+az aks get-credentials --name $clusterName --resource-group $ResourceGroup --overwrite-existing --admin
 
 echo -e "$GREEN Do you want to Attach Azure Container Registry to the cluster ? y/n"
 read attachACR
