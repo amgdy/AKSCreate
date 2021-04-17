@@ -1,4 +1,5 @@
 GREEN="\033[0;32m"
+white='\[\033[0;37m\]'
 echo -e "$GREEN Hi!, This script will help you create Azure Kubernetes Services"
 echo -e "$GREEN These are the prerequisistes needed:"
 echo -e "$GREEN - Global Admin Permission on ADD"
@@ -107,8 +108,8 @@ read AKSVersion
 
 echo -e "$GREEN What is the Resource Group for the Cluster ?"
 read ResourceGroup
-# Assign subnet contributor permissions
-#az role assignment create --assignee $SP_ID --scope $SUBNET_ID --role Contributor
+echo -e "$GREEN Assigning subnet contributor permissions"
+az role assignment create --assignee $SP_ID --scope $SUBNET_ID --role Contributor
 
 az aks create \
     --resource-group $ResourceGroup --name $clusterName \
