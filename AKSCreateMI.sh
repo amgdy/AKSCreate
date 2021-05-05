@@ -8,7 +8,7 @@ echo -e "$GREEN -----------------------------------"
 echo -e "$GREEN Please enter the name of the cluster:"
 read clusterName
 echo export clusterName=$clusterName >> ./var.txt
-echo -e "$GREEN Please enter the location by example 'westeurope/northuae':"
+echo -e "$GREEN Please enter the location by example 'westeurope/uaenorth':"
 read location
 echo export location=$location >> ./var.txt
 echo -e "$GREEN Please enter the Resource-Group for the VNET:"
