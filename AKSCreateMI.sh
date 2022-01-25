@@ -80,6 +80,11 @@ read ResourceGroup
 # Assign subnet contributor permissions
 #az role assignment create --assignee $SP_ID --scope $SUBNET_ID --role Contributor
 
+echo -e "$GREEN What is the name of your Managed Identity to create ?"
+read UManagedIdentity
+
+ManagedIdentityId= az identity create --name $UManagedIdentity --resource-group $ResourceGroup --query "id"
+
 az aks create \
   --resource-group $ResourceGroup\
   --name $clusterName \
@@ -97,6 +102,7 @@ az aks create \
   --aad-admin-group-object-ids $GROUP_ID \
   --aad-tenant-id $tenantId \
   --enable-managed-identity \
+  --assign-identity $ManagedIdentityId
   --kubernetes-version $AKSVersion
 
 echo -e "$GREEN Congratulation AKS Cluster $clusterName has been created!"
