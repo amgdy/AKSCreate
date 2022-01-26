@@ -83,7 +83,7 @@ read ResourceGroup
 echo -e "$GREEN What is the name of your Managed Identity to create ?"
 read UManagedIdentity
 
-ManagedIdentityId=$(az identity create --name $UManagedIdentity --resource-group $ResourceGroup --query "id")
+ManagedIdentityId=$(az identity create --name $UManagedIdentity --resource-group $ResourceGroup --query "id" | tr -d '"')
 
 az aks create \
   --resource-group $ResourceGroup\
