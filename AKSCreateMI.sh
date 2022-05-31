@@ -25,7 +25,7 @@ echo -e "$GREEN Do you have the subnet Created ? y/n"
 read subnetcreated
 if [ $subnetcreated == 'y' ]
 then
-       echo -e "$GREEN Getting exisiting subnet..."
+    echo -e "$GREEN Getting exisiting subnet..."
     VNET_ID=$(az network vnet show --resource-group ${vnetrg} --name $vnetname --query id -o tsv)
     echo export VNET_ID=$VNET_ID >> ./var.txt
     SUBNET_ID=$(az network vnet subnet show --resource-group ${vnetrg} --vnet-name $vnetname --name $subname --query id -o tsv)
@@ -85,6 +85,42 @@ read UManagedIdentity
 
 ManagedIdentityId=$(az identity create --name $UManagedIdentity --resource-group $ResourceGroup --query "id" | tr -d '"')
 
+echo -e "$GREEN Would this cluster host Windows Nodes ? y/n"
+read WindowsNode
+if [ $WindowsNode == 'y' ]
+then
+
+echo -e "$GREEN Please provide username for Windows Nodes ?"
+read WindowsNodeUsername
+echo -e "$GREEN Please provide Password for Windows Nodes ?"
+read WindowsNodePassword
+
+echo export WindowsNodeUsername=$WindowsNodeUsername >> ./var.txt
+echo export WindowsNodePassword=$WindowsNodePassword >> ./var.txt
+
+az aks create \
+  --resource-group $ResourceGroup\
+  --name $clusterName \
+	--location $location \
+  --generate-ssh-keys \
+	--node-count $nodecount \
+	--node-vm-size=$nodeSize \
+	--vm-set-type VirtualMachineScaleSets \
+  --windows-admin-username $WindowsNodeUsername \
+  --windows-admin-password $WindowsNodePassword \
+  --network-plugin azure \
+  --vnet-subnet-id $SUBNET_ID \
+  --docker-bridge-address 172.170.0.1/16 \
+  --service-cidr 172.171.0.0/16 \
+  --dns-service-ip 172.171.0.10 \
+  --enable-aad \
+  --aad-admin-group-object-ids $GROUP_ID \
+  --aad-tenant-id $tenantId \
+  --enable-managed-identity \
+  --assign-identity $ManagedIdentityId
+  --kubernetes-version $AKSVersion
+
+else
 az aks create \
   --resource-group $ResourceGroup\
   --name $clusterName \
@@ -104,6 +140,9 @@ az aks create \
   --enable-managed-identity \
   --assign-identity $ManagedIdentityId
   --kubernetes-version $AKSVersion
+
+fi
+
 
 echo -e "$GREEN Congratulation AKS Cluster $clusterName has been created!"
 echo -e "$GREEN Logging into Cluster Now..."
