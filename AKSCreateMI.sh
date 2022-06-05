@@ -52,6 +52,7 @@ tenantId=$(az account show --query tenantId -o tsv)
             echo -e "$GREEN What is the name of the predefined AD Group?"
             read ADGroup
             GROUP_ID=$(az ad group show -g $ADGroup --query objectId -o tsv)
+	    echo export GROUP_ID=$GROUP_ID >> ./var.txt
         else
             echo -e "$GREEN What is the name of the new AD Group?"
             read ADNEWGroup
@@ -61,37 +62,43 @@ tenantId=$(az account show --query tenantId -o tsv)
             --mail-nickname $ADNEWGroup \
             --query objectId -o tsv)
             echo -e "$GREEN AD Group $ADNEWGroup has been created !"
+	    echo export GROUP_ID=$GROUP_ID >> ./var.txt
         fi
 
 echo -e "$GREEN Creating Cluster..."
 echo -e "$GREEN How many nodes you require for the cluster ?"
 read nodecount
+echo export nodecount=$nodecount >> ./var.txt
 echo -e "$GREEN Node Count will be $nodecount.."
 
 echo -e "$GREEN what is node vm size ? example Standard_D8s_v3"
 read nodeSize
-
+echo export nodeSize=$nodeSize >> ./var.txt
 echo -e "$GREEN Specify AKS version or 1.19.7"
 
 read AKSVersion
-
+echo export AKSVersion=$AKSVersion >> ./var.txt
 echo -e "$GREEN What is the Resource Group for the Cluster ?"
 read ResourceGroup
+echo export ResourceGroup=$ResourceGroup >> ./var.txt
 # Assign subnet contributor permissions
 #az role assignment create --assignee $SP_ID --scope $SUBNET_ID --role Contributor
 
 echo -e "$GREEN What is the name of your Managed Identity to create ?"
 read UManagedIdentity
-
+echo export UManagedIdentity=$UManagedIdentity >> ./var.txt
 ManagedIdentityId=$(az identity create --name $UManagedIdentity --resource-group $ResourceGroup --query "id" | tr -d '"')
 
 echo -e "$GREEN Would this cluster host Windows Nodes ? y/n"
 read WindowsNode
+echo export WindowsNode=$WindowsNode >> ./var.txt
+
 if [ $WindowsNode == 'y' ]
 then
 
 echo -e "$GREEN Please provide username for Windows Nodes ?"
 read WindowsNodeUsername
+
 echo -e "$GREEN Please provide Password for Windows Nodes ?"
 read WindowsNodePassword
 
