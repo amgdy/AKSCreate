@@ -131,6 +131,7 @@ if [ $WindowsNode == 'y' ]; then
     --windows-admin-password $WindowsNodePassword \
     --network-plugin azure \
     --vnet-subnet-id $SUBNET_ID \
+    --docker-bridge-address 172.170.0.1/16 \
     --service-cidr 172.171.0.0/16 \
     --dns-service-ip 172.171.0.10 \
     --enable-aad \
@@ -153,6 +154,7 @@ else
     --vm-set-type VirtualMachineScaleSets \
     --network-plugin kubenet \
     --vnet-subnet-id $SUBNET_ID \
+    --docker-bridge-address 172.170.0.1/16 \
     --service-cidr 172.171.0.0/16 \
     --dns-service-ip 172.171.0.10 \
     --enable-aad \
