@@ -51,16 +51,18 @@ tenantId=$(az account show --query tenantId -o tsv)
         then
             echo -e "$GREEN What is the name of the predefined AD Group?"
             read ADGroup
-            GROUP_ID=$(az ad group show -g $ADGroup --query objectId -o tsv)
+	    echo export ADGroup=$ADGroup >> ./var.txt
+            GROUP_ID=$(az ad group show -g $ADGroup --query id -o tsv)
 	    echo export GROUP_ID=$GROUP_ID >> ./var.txt
         else
             echo -e "$GREEN What is the name of the new AD Group?"
             read ADNEWGroup
+	    echo export ADNEWGroup=$ADNEWGroup >> ./var.txt
             echo -e "$GREEN Creating AD Group.."
             GROUP_ID=$(az ad group create \
             --display-name $ADNEWGroup \
             --mail-nickname $ADNEWGroup \
-            --query objectId -o tsv)
+            --query id -o tsv)
             echo -e "$GREEN AD Group $ADNEWGroup has been created !"
 	    echo export GROUP_ID=$GROUP_ID >> ./var.txt
         fi
@@ -74,7 +76,7 @@ echo -e "$GREEN Node Count will be $nodecount.."
 echo -e "$GREEN what is node vm size ? example Standard_D8s_v3"
 read nodeSize
 echo export nodeSize=$nodeSize >> ./var.txt
-echo -e "$GREEN Specify AKS version or 1.19.7"
+echo -e "$GREEN Specify AKS version or 1.27.3"
 
 read AKSVersion
 echo export AKSVersion=$AKSVersion >> ./var.txt
