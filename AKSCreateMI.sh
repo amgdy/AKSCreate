@@ -180,7 +180,9 @@ echo_italic "User node pools VM Size will be $user_node_size  "
 echo_green "Current supported kubernetes versions for AKS in $color_cyan$cluster_location$color_reset region:"
 az aks get-versions --location "$cluster_location" --output table
 
-k8s_version=$(input_question "Specify kubernetes version for the cluster: (Example: 1.27.3)")
+k8s_highest_version=$(az aks get-versions --location "$cluster_location" --output json --query 'values[?isPreview == `null`].patchVersions[].keys(@)[] | max(@)')
+
+k8s_version=$(input_question "Specify kubernetes version for the cluster: (Example: $k8s_highest_version)")
 log export K8S_VERSION="$k8s_version"
 
 cluster_resource_group=$(input_question "What is the Resource Group for the Cluster?")
