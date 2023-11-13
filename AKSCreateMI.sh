@@ -1,237 +1,307 @@
 #!/bin/bash
+set -e
 
-COLOR_GREEN="\033[0;32m"
-COLOR_RED="\033[31m"
-COLOR_RESET="\033[0m"
-SYSTEMNODE_NAME=systempool01
-WORKERPOOL_NAME=workerpool01
-echo -e "$COLOR_GREEN Hi!, This script will help you create Azure Kubernetes Services $COLOR_RESET"
-echo -e "$COLOR_GREEN These are the prerequisistes needed: $COLOR_RESET"
-echo -e "$COLOR_GREEN - Global Admin Permission on ADD $COLOR_RESET"
-echo -e "$COLOR_GREEN - Subscription Owner $COLOR_RESET"
-echo -e "$COLOR_GREEN Subnet created to Land AKS $COLOR_RESET"
-echo -e "$COLOR_GREEN ----------------------------------- $COLOR_RESET"
-echo -e "$COLOR_GREEN Please enter the name of the cluster:  $COLOR_RESET"
-read -r CLUSTER_NAME
-echo export CLUSTER_NAME=$CLUSTER_NAME >>./var.txt
-echo -e "$COLOR_GREEN Please enter the cluster location: (Example: westeurope or uaenorth) $COLOR_RESET"
-read -r CLUSTER_LOCATION
-echo export CLUSTER_LOCATION=$CLUSTER_LOCATION >>./var.txt
-echo -e "$COLOR_GREEN Please enter the Resource-Group for the VNET:  $COLOR_RESET"
-read -r VNET_RRSOURCE_GROUP
-echo export VNET_RRSOURCE_GROUP=$VNET_RRSOURCE_GROUP >>./var.txt
-echo -e "$COLOR_GREEN Please enter the vnet name:  $COLOR_RESET"
-read -r VNET_NAME
-echo export vnetname=$VNET_NAME >>./var.txt
-echo -e "$COLOR_GREEN Please enter the Subnet name:  $COLOR_RESET"
-read -r SUBNET_NAME
-echo export SUBNET_NAME=$SUBNET_NAME >>./var.txt
+color_green='\033[0;32m'
+color_red=$'\033[31m'
+color_cyan='\033[0;36m'
+color_reset=$'\033[0m'
+systempool_name=systempool01
+workerpool_name=workerpool01
+timestamp=$(date +"%Y%m%d%H%M%S")
+vars_file="vars-$timestamp.txt"
 
-echo -e "$COLOR_GREEN Do you have the subnet ALREADY Created ? [y/n] $COLOR_RESET"
-read -r SUBNET_ALREADY_CREATED
-if [ $SUBNET_ALREADY_CREATED == 'y' ]; then
-  echo -e "$COLOR_GREEN Getting exisiting subnet... $COLOR_RESET"
-  VNET_ID=$(az network vnet show --resource-group ${VNET_RRSOURCE_GROUP} --name $VNET_NAME --query id -o tsv)
-  echo export VNET_ID=$VNET_ID >>./var.txt
-  SUBNET_ID=$(az network vnet subnet show --resource-group ${VNET_RRSOURCE_GROUP} --vnet-name $VNET_NAME --name $SUBNET_NAME --query id -o tsv)
-  echo export SUBNET_ID=$SUBNET_ID >>./var.txt
-else
+function echo_green() {
+  echo -e "$color_green$* $color_reset"
+}
 
-  echo -e "$COLOR_GREEN Ok! What is the address-prefix for the subnet? (Example: 10.179.128.0/21) $COLOR_RESET"
-  read -r SUBNET_ADDRESS_PREFIX
-  echo -e "$COLOR_GREEN Creating subnet for AKS cluster... $COLOR_RESET"
-  VNET_ID=$(az network vnet show --resource-group ${VNET_RRSOURCE_GROUP} --name $VNET_NAME --query id -o tsv)
-  echo export VNET_ID=$VNET_ID >>./var.txt
-  SUBNET_ID=$(az network vnet subnet create -n aks-subnet -g ${VNET_RRSOURCE_GROUP} --vnet-name $VNET_NAME --address-prefix $SUBNET_ADDRESS_PREFIX --query "id" -o tsv)
-  echo export SUBNET_ID=$SUBNET_ID >>./var.txt
-  echo -e "$COLOR_GREEN Subnet $SUBNET_ID has been created!... $COLOR_RESET"
+function echo_cyan() {
+  echo -e "$color_cyan$* $color_reset"
+}
+
+function echo_red() {
+  echo -e "$color_red$* $color_reset"
+}
+
+function echo_italic() {
+  echo -e "\e[3m$* $color_reset\e[0m"
+}
+
+function yes_no_question() {
+  local input
+  local prompt="$1 [Y/n]: "
+  local default="${2:-Y}"
+
+  while read -e -p "$prompt" -r -n 1 input && ! [[ "$input" =~ ^[YyNn]?$ ]]; do
+    echo "Invalid input. Please enter 'Y', 'N', or press Enter for $default."
+  done
+
+  echo "${input:-$default}" | tr '[:upper:]' '[:lower:]'
+}
+
+function input_question() {
+  local prompt_message="$1: "
+  local input_value
+  while [[ -z "$input_value" ]]; do
+    read -p "$prompt_message" -r input_value
+    if [[ -z "$input_value" ]]; then
+      echo "Input cannot be empty. Please try again."
+    fi
+  done
+
+  echo "$input_value"
+}
+function select_item() {
+  local items=("$@")
+  local select_message="$1"
+  local items_to_select=("${items[@]:1}") # Exclude the first element
+  PS3="$select_message: "
+  select option in "${items_to_select[@]}"; do
+    if [[ -n "$option" ]]; then
+      if [[ $option =~ \((.+)\) ]]; then
+        local selected_item="${BASH_REMATCH[1]}"
+        echo_italic "You've selected: $option" >&2
+        echo "$selected_item"
+        break
+      else
+        echo "Invalid format. Please try again." >&2
+      fi
+    else
+      echo "Invalid selection. Please try again." >&2
+    fi
+  done
+}
+
+function log() {
+  echo "$*" >>./"$vars_file"
+}
+
+if [ -n "$1" ]; then
+  vars_file=$1
 fi
 
-echo -e "$COLOR_GREEN Should we use Kubenet (Otherwise will use Azure CNI)? [y/n] $COLOR_RESET"
-read -r USE_KUBENET
+echo_green "Hi!, This script will help you create Azure Kubernetes Services"
+echo_green "These are the prerequisistes needed: 
+- Permissions:
+  - Azure Subscription Owner
+  - Entra ID (Azure AD) global administrator (optional if your have the cluster admins group already created)
+- Pre-provisioned resources:
+  - Virtual Network to connect the cluster to it.
+  - Subnet inside that vnet (optional if you want the script to create it)"
+echo_green "----------------------------------- "
 
-if [ $USE_KUBENET == 'y' ]; then
-  CLUSTER_NETWORK=kubenet
+echo_cyan "Variables log file will be: $vars_file" && log ""
+
+cluster_name=$(input_question "Please enter the name of the cluster")
+log export CLUSTER_NAME="$cluster_name"
+
+cluster_location=$(input_question "Please enter the cluster location (Example: westeurope or uaenorth)")
+log export CLUSTER_LOCATION="$cluster_location"
+
+vnet_resource_group=$(input_question "Please enter the Resource-Group for the VNET")
+log export VNET_RRSOURCE_GROUP="$vnet_resource_group"
+
+vnet_name=$(input_question "Please enter the vnet name")
+log export VNET_NAME="$vnet_name"
+
+subnet_name=$(input_question "Please enter the Subnet name")
+log export SUBNET_NAME="$subnet_name"
+
+is_snet_created=$(yes_no_question "Do you have the subnet ALREADY Created?")
+
+if [ "$is_snet_created" == 'y' ]; then
+  echo_green "Getting exisiting subnet... "
+  vnet_id=$(az network vnet show --resource-group "$vnet_resource_group" --name "$vnet_name" --query id -o tsv)
+  log export VNET_ID="$vnet_id"
+  subnet_id=$(az network vnet subnet show --resource-group "$vnet_resource_group" --vnet-name "$vnet_name" --name "$subnet_name" --query id -o tsv)
+  log export SUBNET_ID="$subnet_id"
 else
-  CLUSTER_NETWORK=azure
+  subnet_address_prefix=$(input_question "Ok! What is the address-prefix for the subnet? (Example: 10.179.128.0/21)")
+  echo_green "Creating subnet for AKS cluster... "
+  vnet_id=$(az network vnet show --resource-group "$vnet_resource_group" --name "$vnet_name" --query id -o tsv)
+  log export VNET_ID="$vnet_id"
+  subnet_id=$(az network vnet subnet create -n aks-subnet -g "$vnet_resource_group" --vnet-name "$vnet_name" --address-prefix "$subnet_address_prefix" --query "id" -o tsv)
+  log export SUBNET_ID="$subnet_id"
+  echo_green "Subnet $subnet_id has been created!... "
 fi
 
-echo export CLUSTER_NETWORK=$CLUSTER_NETWORK >>./var.txt
+network_plugins=(
+  "Kubenet (kubenet): Each pod is assigned a logically different IP address from the subnet for simpler setup"
+  "Azure CNI (azure): Each pod and node is assigned a unique IP for advanced configurations")
+cluster_network=$(select_item "Choose cluster network configuration" "${network_plugins[@]}")
 
-echo -e "$COLOR_GREEN Geting tenant ID... $COLOR_RESET"
-TENANT_ID=$(az account show --query tenantId -o tsv)
+log export CLUSTER_NETWORK="$cluster_network"
 
-echo -e "$COLOR_GREEN do you have a predefined Admin Group ? [y/n] $COLOR_RESET"
-read -r AAD_GROUP_ALREADY_CREATED
-if [ $AAD_GROUP_ALREADY_CREATED == 'y' ]; then
-  echo -e "$COLOR_GREEN What is the name of the predefined AD Group? $COLOR_RESET"
-  read -r AAD_GROUP_NAME
-  echo export AAD_GROUP_NAME=$AAD_GROUP_NAME >>./var.txt
-  AAD_GROUP_ID=$(az ad group show -g $AAD_GROUP_NAME --query id -o tsv)
-  echo export AAD_GROUP_ID=$AAD_GROUP_ID >>./var.txt
+echo_green "Geting tenant ID... "
+tenant_id=$(az account show --query tenantId -o tsv)
+
+is_aad_group_created=$(yes_no_question "Do you have an existing Entra ID (Azure AD) Group to use?")
+
+if [ "$is_aad_group_created" == 'y' ]; then
+  aad_existing_group_name=$(input_question "What is the group name to use?")
+  log export AAD_GROUP_NAME="$aad_existing_group_name"
+
+  aad_group_id=$(az ad group show -g "$aad_existing_group_name" --query id -o tsv)
+  log export AAD_GROUP_ID="$aad_group_id"
 else
-  echo -e "$COLOR_GREEN What is the name of the new AD Group? $COLOR_RESET"
-  read -r AAD_GROUP_NEW_NAME
-  echo export AAD_GROUP_NEW_NAME=$AAD_GROUP_NEW_NAME >>./var.txt
-  echo -e "$COLOR_GREEN Creating AD Group.."
-  AAD_GROUP_ID=$(az ad group create \
-    --display-name $AAD_GROUP_NEW_NAME \
-    --mail-nickname $AAD_GROUP_NEW_NAME \
+  aad_new_group_name=$(input_question "What is the group name to create?")
+  log export AAD_NEW_GROUP_NAME="$aad_new_group_name"
+
+  echo_green "Creating AD Group.."
+  aad_group_id=$(az ad group create \
+    --display-name "$aad_new_group_name" \
+    --mail-nickname "$aad_new_group_name" \
     --query id -o tsv)
-  echo -e "$COLOR_GREEN AD Group $AAD_GROUP_NEW_NAME has been created ! $COLOR_RESET"
-  echo export AAD_GROUP_ID=$AAD_GROUP_ID >>./var.txt
+  echo_green "AD Group $aad_new_group_name has been created !"
+  log export AAD_GROUP_ID="$aad_group_id"
 fi
 
-echo -e "$COLOR_GREEN Now let's configure System and User node pools for the cluster:  $COLOR_RESET"
-echo -e "$COLOR_GREEN System node pools serve the primary purpose of hosting critical *system pods* such as CoreDNS, konnectivity, metrics-server... $COLOR_RESET"
-echo -e "$COLOR_GREEN What is the count of System node pools? (2 or higher is recommended) $COLOR_RESET"
-read -r SYSTEM_NODE_COUNT
-echo export SYSTEM_NODE_COUNT=$SYSTEM_NODE_COUNT >>./var.txt
-echo -e "$COLOR_GREEN System node pools count will be $SYSTEM_NODE_COUNT $COLOR_RESET"
+echo_green "Now let's configure System and User node pools for the cluster: "
+echo_green "System node pools serve the primary purpose of hosting critical$color_cyan system pods$color_reset such as CoreDNS, konnectivity, metrics-server... "
 
-echo -e "$COLOR_GREEN What is the system node pools VM Size? (example: Standard_DS4_v2) $COLOR_RESET"
-read -r SYSTEM_NODE_SIZE
-echo export SYSTEM_NODE_SIZE=$SYSTEM_NODE_SIZE >>./var.txt
-echo -e "$COLOR_GREEN System node pools VM Size will be $SYSTEM_NODE_SIZE $COLOR_RESET"
+system_node_count=$(input_question "What is the count of System node pools? (2 or higher is recommended)")
+log export SYSTEM_NODE_COUNT="$system_node_count"
+echo_italic "System node pools count will be $system_node_count "
 
-echo -e "$COLOR_GREEN User node pools serve the primary purpose of hosting your application pods. $COLOR_RESET"
+system_node_size=$(input_question "What is the system node pools VM Size? (example: Standard_DS4_v2)")
+log export SYSTEM_NODE_SIZE="$system_node_size"
+echo_italic "System node pools VM Size will be $system_node_size "
 
-echo -e "$COLOR_GREEN What is the user node pools count? (3 or higher *odd number* is recommended) $COLOR_RESET"
-read -r USER_NODE_COUNT
-echo export USER_NODE_COUNT=$USER_NODE_COUNT >>./var.txt
-echo -e "$COLOR_GREEN User node pools count will be $USER_NODE_COUNT.  $COLOR_RESET"
+echo_green "User node pools serve the primary purpose of $color_cyan hosting your application pods.$color_reset"
 
-echo -e "$COLOR_GREEN What is the user node pools VM Size? (example: Standard_D8s_v3) $COLOR_RESET"
-read -r USER_NODE_SIZE
-echo export USER_NODE_SIZE=$USER_NODE_SIZE >>./var.txt
-echo -e "$COLOR_GREEN User node pools VM Size will be $USER_NODE_SIZE  $COLOR_RESET"
+user_node_count=$(input_question "What is the user node pools count? (3 or higher$color_cyan odd number$color_reset is recommended)")
+log export USER_NODE_COUNT="$user_node_count"
 
-echo -e "$COLOR_GREEN Current Support Kubernetes version for AKS $COLOR_RESET"
-az aks get-versions --location $CLUSTER_LOCATION --output table
+echo_italic "User node pools count will be $user_node_count.  "
 
-echo -e "$COLOR_GREEN Specify kubernetes version for the cluster: (Example: 1.27.3) $COLOR_RESET"
-read -r K8S_VERSION
-echo export K8S_VERSION=$K8S_VERSION >>./var.txt
+user_node_size=$(input_question "What is the user node pools VM Size? (example: Standard_D8s_v3)")
+log export USER_NODE_SIZE="$user_node_size"
+echo_italic "User node pools VM Size will be $user_node_size  "
 
-echo -e "$COLOR_GREEN What is the Resource Group for the Cluster? $COLOR_RESET"
-read -r CLUSTER_RESOURCE_GRPUP
-echo export CLUSTER_RESOURCE_GRPUP=$CLUSTER_RESOURCE_GRPUP >>./var.txt
-# Assign subnet contributor permissions
-#az role assignment create --assignee $SP_ID --scope $SUBNET_ID --role Contributor
+echo_green "Current supported kubernetes versions for AKS in $color_cyan$cluster_location$color_reset region:"
+az aks get-versions --location "$cluster_location" --output table
 
-echo -e "$COLOR_GREEN What is the name of your Managed Identity to create ? (We will this as User-Assigned Managed Identity for the cluster) $COLOR_RESET"
-read -r MANAGED_IDENTITY_NAME
-echo export MANAGED_IDENTITY_NAME=$MANAGED_IDENTITY_NAME >>./var.txt
-MANAGED_IDENTITY_ID=$(az identity create --name $MANAGED_IDENTITY_NAME --resource-group $CLUSTER_RESOURCE_GRPUP --query "id" | tr -d '"')
-echo export MANAGED_IDENTITY_ID=$MANAGED_IDENTITY_ID >>./var.txt
+k8s_version=$(input_question "Specify kubernetes version for the cluster: (Example: 1.27.3)")
+log export K8S_VERSION="$k8s_version"
 
-echo -e "$COLOR_GREEN Should we use AzureLinux? (Otherwise will use Ubuntu)? [y/n] $COLOR_RESET"
-read -r USE_AZURELINUX
-echo export USE_AZURELINUX=$USE_AZURELINUX >>./var.txt
+cluster_resource_group=$(input_question "What is the Resource Group for the Cluster?")
+log export CLUSTER_RESOURCE_GRPUP="$cluster_resource_group"
 
-if [ $USE_AZURELINUX == 'y' ]; then
-  OS_SKU=AzureLinux
-else
-  OS_SKU=Ubuntu
-fi
+echo_green "We will User-assigned Managed Identity for the cluster"
+managed_identity_name=$(input_question "What is the name of your Managed Identity to use/create ?")
+log export MANAGED_IDENTITY_NAME="$managed_identity_name"
+managed_identity_id=$(az identity create --name "$managed_identity_name" --resource-group "$cluster_resource_group" --query "id" | tr -d '"')
+log export MANAGED_IDENTITY_ID="$managed_identity_id"
 
-echo export OS_SKU=$OS_SKU >>./var.txt
+os_skus=(
+  "Azure Linux (AzureLinux) - Recommened"
+  "Ubuntu (ubuntu)")
+os_sku=$(select_item "Choose cluster host OS" "${os_skus[@]}")
+log export OS_SKU="$os_sku"
 
-echo -e "$COLOR_GREEN Would this cluster host Windows Nodes ? [y/n] $COLOR_RESET"
-read -r WINDOWS_NODE
-echo export WINDOWS_NODE=$WINDOWS_NODE >>./var.txt
+cluster_tiers=(
+  "Standard (standard) - Recommended"
+  "Free (free) - NO financially backed API server uptime SLA!"
+)
 
-if [ $WINDOWS_NODE == 'y' ]; then
+cluster_tier=$(select_item "Choose cluster pricing tier" "${cluster_tiers[@]}")
+log export CLUSTER_TIER="$cluster_tier"
 
-  echo -e "$COLOR_GREEN Please provide username for Windows Nodes? $COLOR_RESET"
-  read -r WINDOWS_NODE_USERNAME
+host_windows_node=$(yes_no_question "Would this cluster host Windows Nodes?")
+log export HOST_WINDOWS_NODE="$host_windows_node"
 
-  echo -e "$COLOR_GREEN Please provide Password for Windows Nodes? $COLOR_RESET"
-  read -r WINDOWS_NODE_PASSWORD
+if [ "$host_windows_node" == 'y' ]; then
+  windows_node_username=$(input_question "Please provide username for Windows Nodes?")
+  log export WINDOWS_NODE_USERNAME="$windows_node_username"
 
-  echo export WINDOWS_NODE_USERNAME=$WINDOWS_NODE_USERNAME >>./var.txt
-  echo export WINDOWS_NODE_PASSWORD=$WINDOWS_NODE_PASSWORD >>./var.txt
-  echo -e "$COLOR_GREEN Creating Windows-based Cluster..."
+  windows_node_password=$(input_question "Please provide password for Windows Nodes?")
+  log export WINDOWS_NODE_PASSWORD=
+
+  echo_green "Creating Windows-based Cluster..."
   az aks create \
-    --resource-group $CLUSTER_RESOURCE_GRPUP \
-    --name $CLUSTER_NAME \
-    --location $CLUSTER_LOCATION \
+    --resource-group "$cluster_resource_group" \
+    --name "$cluster_name" \
+    --location "$cluster_location" \
     --generate-ssh-keys \
-    --node-count $SYSTEM_NODE_COUNT \
-    --node-vm-size=$SYSTEM_NODE_SIZE \
+    --node-count "$system_node_count" \
+    --node-vm-size="$system_node_size" \
     --vm-set-type VirtualMachineScaleSets \
-    --windows-admin-username $WINDOWS_NODE_USERNAME \
-    --windows-admin-password $WINDOWS_NODE_PASSWORD \
+    --windows-admin-username "$windows_node_username" \
+    --windows-admin-password "$windows_node_password" \
     --network-plugin azure \
-    --vnet-subnet-id $SUBNET_ID \
+    --vnet-subnet-id "$subnet_id" \
     --service-cidr 172.171.0.0/16 \
     --dns-service-ip 172.171.0.10 \
     --enable-aad \
-    --aad-admin-group-object-ids $AAD_GROUP_ID \
-    --aad-tenant-id $TENANT_ID \
+    --aad-admin-group-object-ids "$aad_group_id" \
+    --aad-tenant-id "$tenant_id" \
     --enable-managed-identity \
-    --assign-identity $MANAGED_IDENTITY_ID \
-    --kubernetes-version $K8S_VERSION \
-    --nodepool-name systempool01 \
-    --os-sku $OS_SKU
+    --assign-identity "$managed_identity_id" \
+    --kubernetes-version "$k8s_version" \
+    --nodepool-name "$systempool_name" \
+    --os-sku "$os_sku" \
+    --tier "$cluster_tier"
 
 else
-  echo -e "$COLOR_GREEN Creating Linux-based Cluster... $COLOR_RESET"
+  echo_green "Creating Linux-based Cluster... "
   az aks create \
-    --resource-group $CLUSTER_RESOURCE_GRPUP \
-    --name $CLUSTER_NAME \
-    --location $CLUSTER_LOCATION \
+    --resource-group "$cluster_resource_group" \
+    --name "$cluster_name" \
+    --location "$cluster_location" \
     --generate-ssh-keys \
-    --node-count $SYSTEM_NODE_COUNT \
-    --node-vm-size=$SYSTEM_NODE_SIZE \
+    --node-count "$system_node_count" \
+    --node-vm-size "$system_node_size" \
     --vm-set-type VirtualMachineScaleSets \
-    --network-plugin $CLUSTER_NETWORK \
-    --vnet-subnet-id $SUBNET_ID \
+    --network-plugin "$cluster_network" \
+    --vnet-subnet-id "$subnet_id" \
     --service-cidr 172.171.0.0/16 \
     --dns-service-ip 172.171.0.10 \
     --enable-aad \
-    --aad-admin-group-object-ids $AAD_GROUP_ID \
-    --aad-tenant-id $TENANT_ID \
+    --aad-admin-group-object-ids "$aad_group_id" \
+    --aad-tenant-id "$tenant_id" \
     --enable-managed-identity \
-    --assign-identity $MANAGED_IDENTITY_ID \
-    --kubernetes-version $K8S_VERSION \
-    --nodepool-name $SYSTEMNODE_NAME \
-    --os-sku $OS_SKU
-
+    --assign-identity "$managed_identity_id" \
+    --kubernetes-version "$k8s_version" \
+    --nodepool-name "$systempool_name" \
+    --os-sku "$os_sku" \
+    --tier "$cluster_tier"
 fi
 
 if [ $? -eq 0 ]; then
-  echo -e "$COLOR_GREEN Adding User Node Pool $WORKERPOOL_NAME to the cluster... $COLOR_RESET"
+  echo_green "Adding User Node Pool $workerpool_name to the cluster... "
 
   az aks nodepool add \
-    --cluster-name $CLUSTER_NAME \
-    --name $WORKERPOOL_NAME \
-    --resource-group $CLUSTER_RESOURCE_GRPUP \
+    --cluster-name "$cluster_name" \
+    --name "$workerpool_name" \
+    --resource-group "$cluster_resource_group" \
     --mode User \
-    --node-count $USER_NODE_COUNT \
-    --node-vm-size $USER_NODE_SIZE \
-    --kubernetes-version $K8S_VERSION \
-    --os-sku $OS_SKU
+    --node-count "$user_node_count" \
+    --node-vm-size "$user_node_size" \
+    --kubernetes-version "$k8s_version" \
+    --os-sku "$os_sku"
 
-  echo -e "$COLOR_GREEN Congratulation AKS Cluster $CLUSTER_NAME has been created! $COLOR_RESET"
-  echo -e "$COLOR_GREEN Logging into Cluster Now... $COLOR_RESET"
+  echo_green "Congratulation AKS Cluster $cluster_name has been created! "
+  echo_green "Logging into Cluster Now... "
 
-  az aks get-credentials --name $CLUSTER_NAME --resource-group $CLUSTER_RESOURCE_GRPUP --overwrite-existing --admin
+  az aks get-credentials --name "$cluster_name" --resource-group "$cluster_resource_group" --overwrite-existing --admin
+  kubelogin convert-kubeconfig -l azurecli
 
   if [ $? -eq 0 ]; then
-    echo -e "$COLOR_GREEN Do you want to Attach Azure Container Registry to the cluster ? [y/n] $COLOR_RESET"
-    read -r ACR_ATTACH
-    if [ $ACR_ATTACH == 'y' ]; then
-      echo -e "$COLOR_GREEN What is the Container Register Name ? $COLOR_RESET"
-      read -r ACR_NAME
-      echo export ACR_NAME=$ACR_NAME >>./var.txt
-      az aks update --name $CLUSTER_NAME -g $CLUSTER_RESOURCE_GRPUP --attach-acr $ACR_NAME
+    attach_acr=$(yes_no_question "Do you want to Attach Azure Container Registry to the cluster ?")
+    log export ATTACH_ACR="$attach_acr"
+
+    if [ "$attach_acr" == 'y' ]; then
+      acr_name=$(input_question "What is the Azure Container Register Name?")
+      log export ACR_NAME="$acr_name"
+      az aks update --name "$cluster_name" -g "$cluster_resource_group" --attach-acr "$acr_name"
     else
       echo -e "."
     fi
 
-    echo -e "$COLOR_GREEN Congratulation you have created Managed AAD Cluster with Managed Identity $COLOR_RESET"
+    echo_green "Congratulation you have created Managed AAD Cluster with Managed Identity"
+    echo_green "Listing all deployments in all namespaces"
+    kubectl get deployments --all-namespaces=true
+
   fi
 else
-  echo -e "$RED Failed to create the cluster!  $COLOR_RESET"
+  echo_red "Failed to create the cluster!"
 fi
