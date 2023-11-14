@@ -89,6 +89,15 @@ if [ -n "$1" ]; then
   vars_file=$1
 fi
 
+cat <<EOF
+
+░█▀█░█░█░█▀▀░░░█▀█░█▀▄░█▀█░█░█░▀█▀░█▀▀░▀█▀░█▀█░█▀█░█▀▀░█▀▄
+░█▀█░█▀▄░▀▀█░░░█▀▀░█▀▄░█░█░▀▄▀░░█░░▀▀█░░█░░█░█░█░█░█▀▀░█▀▄
+░▀░▀░▀░▀░▀▀▀░░░▀░░░▀░▀░▀▀▀░░▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀
+
+
+EOF
+
 echo_green "Hi!, This script will help you create Azure Kubernetes Services https://azure.microsoft.com/en-us/products/kubernetes-service"
 echo_green "These are the prerequisistes needed: 
 - Permissions:
@@ -324,7 +333,7 @@ else
 fi
 
 if [ $? -eq 0 ]; then
-  echo_green "Adding User Node Pool ${ANSI_ITALIC}$WORKERPOOL_NAME${ANSI_RESET} to the cluster... "
+  echo_green "Adding User Node Pool ${ANSI_COLOR_CYAN}$WORKERPOOL_NAME${ANSI_COLOR_GREEN_LIGHT} to the cluster... "
 
   az aks nodepool add \
     --cluster-name "$CLUSTER_NAME" \
@@ -336,7 +345,7 @@ if [ $? -eq 0 ]; then
     --kubernetes-version "$K8S_VERSION" \
     --os-sku "$OS_SKU"
 
-  echo_green "Congratulation AKS Cluster ${ANSI_ITALIC}$CLUSTER_NAME${ANSI_RESET} has been created! "
+  echo_green "Congratulation AKS Cluster ${ANSI_COLOR_CYAN}$CLUSTER_NAME${ANSI_COLOR_GREEN_LIGHT} has been created! "
   echo_green "Congratulation you have created Managed AAD Cluster with Managed Identity"
 
   if [ "$attach_acr" == 'y' ]; then
@@ -345,6 +354,8 @@ if [ $? -eq 0 ]; then
   else
     echo_italic "Skipping attaching Azure Container Registry to the cluster."
   fi
+
+  echo_cyan "Variables log filenem: $vars_file"
 
   if [ $? -eq 0 ]; then
     echo_green "Logging into Cluster Now... "

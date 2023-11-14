@@ -1,0 +1,5 @@
+export CLUSTER_NAME=eee
+export CLUSTER_LOCATION=eee
+export VNET_RRSOURCE_GROUP=ee
+export vnetname=e
+export SUBNET_NAME=e

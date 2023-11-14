@@ -1,0 +1,28 @@
+
+export CLUSTER_NAME=aks-tst-eus-11
+export CLUSTER_LOCATION=eastus
+export VNET_RRSOURCE_GROUP=rg-test-eus-001
+export VNET_NAME=vnet-test-eus-001
+export SUBNET_NAME=snet-aks
+export VNET_ID=/subscriptions/2d2d445d-0539-4050-a025-d5eca3c416ca/resourceGroups/rg-test-eus-001/providers/Microsoft.Network/virtualNetworks/vnet-test-eus-001
+export SUBNET_ID=/subscriptions/2d2d445d-0539-4050-a025-d5eca3c416ca/resourceGroups/rg-test-eus-001/providers/Microsoft.Network/virtualNetworks/vnet-test-eus-001/subnets/snet-aks
+export CLUSTER_NETWORK=kubenet
+export TENANT_ID=16b3c013-d300-468d-ac64-7eda0820b6d3
+export AAD_GROUP_NAME=amagdy-aksadmins-001
+export AAD_GROUP_ID=81646a95-94cb-41c8-b603-bc178786a17d
+export SYSTEM_NODE_COUNT=1
+export SYSTEM_NODE_SIZE=Standard_B2ms
+export USER_NODE_COUNT=1
+export USER_NODE_SIZE=Standard_B2ms
+export K8S_VERSION=1.27.3
+export CLUSTER_RESOURCE_GRPUP=rg-test-eus-001
+export MANAGED_IDENTITY_NAME=mi-test-eus-12
+export MANAGED_IDENTITY_ID=/subscriptions/2d2d445d-0539-4050-a025-d5eca3c416ca/resourcegroups/rg-test-eus-001/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi-test-eus-12
+export OS_SKU=AzureLinux
+export CLUSTER_TIER=free
+export HOST_WINDOWS_NODE=n
+export ATTACH_ACR=y
+export ACR_NAME=amagdy
+
+export CLUSTER_NAME=aa
+
