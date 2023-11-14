@@ -10,7 +10,7 @@ ANSI_ITALIC=$'\e[3m'
 ANSI_BOLD=$'\e[1m'
 SYSTEMPOOL_NAME=syspool001
 WORKERPOOL_NAME=usrpool001
-TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+TIMESTAMP=$(date +"%y%m%d-%H%M%S")
 vars_file="vars-$TIMESTAMP.txt"
 
 function echo_green() {
