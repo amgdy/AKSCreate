@@ -39,7 +39,7 @@ function yes_no_question() {
   local default="${2:-Y}"
 
   while read -e -p "$prompt" -r -n 1 input && ! [[ "$input" =~ ^[YyNn]?$ ]]; do
-    echo "Invalid input. Please enter 'Y', 'N', or press Enter for $default."
+    echo "Invalid input. Please enter 'Y', 'N', or press Enter for $default." >&2
   done
 
   echo "${input:-$default}" | tr '[:upper:]' '[:lower:]'
@@ -53,7 +53,7 @@ function input_question() {
     echo -n -e "${ANSI_BOLD}$prompt_message${ANSI_RESET}" >&2
     read -r input_value
     if [[ -z "$input_value" ]]; then
-      echo "Input cannot be empty. Please try again."
+      echo "Input cannot be empty. Please try again." >&2
     fi
   done
 
@@ -232,9 +232,9 @@ CLUSTER_RESOURCE_GRPUP=$(input_question "What is the Resource Group for the Clus
 log export CLUSTER_RESOURCE_GRPUP="$CLUSTER_RESOURCE_GRPUP"
 
 echo_green "We will User-assigned Managed Identity for the cluster"
-MANAGED_IDENTITY_NAME=$(input_question "What is the name of your Managed Identity to use/create ?")
-log export MANAGED_IDENTITY_NAME="$MANAGED_IDENTITY_NAME"
-MANAGED_IDENTITY_ID=$(az identity create --name "$MANAGED_IDENTITY_NAME" --resource-group "$CLUSTER_RESOURCE_GRPUP" --query "id" | tr -d '"')
+managed_identity_name=$(input_question "What is the name of your Managed Identity to use/create ?")
+
+MANAGED_IDENTITY_ID=$(az identity create --name "$managed_identity_name" --resource-group "$CLUSTER_RESOURCE_GRPUP" --query "id" | tr -d '"')
 log export MANAGED_IDENTITY_ID="$MANAGED_IDENTITY_ID"
 
 os_skus=(
@@ -255,7 +255,6 @@ host_windows_node=$(yes_no_question "Would this cluster host Windows Nodes?")
 log export HOST_WINDOWS_NODE="$host_windows_node"
 
 attach_acr=$(yes_no_question "Do you want to Attach Azure Container Registry to the cluster ?")
-log export ATTACH_ACR="$attach_acr"
 
 if [ "$attach_acr" == 'y' ]; then
   ACR_NAME=$(input_question "What is the Azure Container Register Name?")
