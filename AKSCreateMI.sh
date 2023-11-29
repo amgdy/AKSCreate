@@ -404,28 +404,59 @@ if [ "$host_windows_node" == 'y' ]; then
 
 else
     echo_green "Creating Linux-based Cluster... "
-    az aks create \
-        --resource-group "$CLUSTER_RESOURCE_GRPUP" \
-        --name "$CLUSTER_NAME" \
-        --location "$CLUSTER_LOCATION" \
-        --generate-ssh-keys \
-        --node-count "$SYSTEM_NODE_COUNT" \
-        --node-vm-size "$SYSTEM_NODE_SIZE" \
-        --vm-set-type VirtualMachineScaleSets \
-        --network-plugin "$CLUSTER_NETWORK" \
-        --vnet-subnet-id "$SUBNET_ID" \
-        --pod-cidr $pod_cidr \
-        --service-cidr $services_cidr \
-        --dns-service-ip $dns_service_ip \
-        --enable-aad \
-        --aad-admin-group-object-ids "$AAD_GROUP_ID" \
-        --aad-tenant-id "$TENANT_ID" \
-        --enable-managed-identity \
-        --assign-identity "$MANAGED_IDENTITY_ID" \
-        --kubernetes-version "$K8S_VERSION" \
-        --nodepool-name "$SYSTEMPOOL_NAME" \
-        --os-sku "$OS_SKU" \
-        --tier "$CLUSTER_TIER"
+
+    case "$CLUSTER_NETWORK" in
+    azure)
+        az aks create \
+            --resource-group "$CLUSTER_RESOURCE_GRPUP" \
+            --name "$CLUSTER_NAME" \
+            --location "$CLUSTER_LOCATION" \
+            --generate-ssh-keys \
+            --node-count "$SYSTEM_NODE_COUNT" \
+            --node-vm-size "$SYSTEM_NODE_SIZE" \
+            --vm-set-type VirtualMachineScaleSets \
+            --network-plugin "$CLUSTER_NETWORK" \
+            --vnet-subnet-id "$SUBNET_ID" \
+            --service-cidr $services_cidr \
+            --dns-service-ip $dns_service_ip \
+            --enable-aad \
+            --aad-admin-group-object-ids "$AAD_GROUP_ID" \
+            --aad-tenant-id "$TENANT_ID" \
+            --enable-managed-identity \
+            --assign-identity "$MANAGED_IDENTITY_ID" \
+            --kubernetes-version "$K8S_VERSION" \
+            --nodepool-name "$SYSTEMPOOL_NAME" \
+            --os-sku "$OS_SKU" \
+            --tier "$CLUSTER_TIER"
+        ;;
+
+    *)
+        # default case: commands to create the cluster if CLUSTER_NETWORK doesn't match any of the above
+        # kubenet
+        az aks create \
+            --resource-group "$CLUSTER_RESOURCE_GRPUP" \
+            --name "$CLUSTER_NAME" \
+            --location "$CLUSTER_LOCATION" \
+            --generate-ssh-keys \
+            --node-count "$SYSTEM_NODE_COUNT" \
+            --node-vm-size "$SYSTEM_NODE_SIZE" \
+            --vm-set-type VirtualMachineScaleSets \
+            --network-plugin "$CLUSTER_NETWORK" \
+            --vnet-subnet-id "$SUBNET_ID" \
+            --pod-cidr $pod_cidr \
+            --service-cidr $services_cidr \
+            --dns-service-ip $dns_service_ip \
+            --enable-aad \
+            --aad-admin-group-object-ids "$AAD_GROUP_ID" \
+            --aad-tenant-id "$TENANT_ID" \
+            --enable-managed-identity \
+            --assign-identity "$MANAGED_IDENTITY_ID" \
+            --kubernetes-version "$K8S_VERSION" \
+            --nodepool-name "$SYSTEMPOOL_NAME" \
+            --os-sku "$OS_SKU" \
+            --tier "$CLUSTER_TIER"
+        ;;
+    esac
 fi
 
 if [ $? -eq 0 ]; then
