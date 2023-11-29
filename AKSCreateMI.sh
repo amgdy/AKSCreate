@@ -14,6 +14,10 @@ WORKERPOOL_NAME=usrpool001
 TIMESTAMP=$(date +"%y%m%d-%H%M%S")
 vars_file="vars-$TIMESTAMP.txt"
 
+pod_cidr='10.10.0.0/16'
+services_cidr='10.0.0.0/16'
+dns_service_ip='10.0.0.10'
+
 function echo_green() {
     echo -e "${ANSI_COLOR_GREEN_LIGHT}$*${ANSI_RESET}"
 }
@@ -151,13 +155,14 @@ CLUSTER_NAME=$(input_question "Please enter the name of the cluster")
 log export CLUSTER_NAME="$CLUSTER_NAME"
 
 recommened_regions=(
-    "UK South [uksouth]."
-    "UK West [ukwest]."
-    "North Europe [northeurope]."
-    "West Europe [westeurope]."
-    "UAE North [uaenorth]."
-    "East US [eastus]."
-    "Type another location (region) [_]."
+    "(Europe) North Europe [northeurope]"
+    "(Europe) West Europe [westeurope]"
+    "(Europe) France Central [francecentral]"
+    "(Middle East) UAE North [uaenorth]"
+    "(Middle East) Qatar Central [qatarcentral]"
+    "(Asia Pacific) Central India [centralindia]"
+    "(US) East US [eastus]"
+    "Type another location (region) [_] https://azure.microsoft.com/en-us/explore/global-infrastructure/geographies/#choose-your-region"
 )
 CLUSTER_LOCATION=$(select_item "Choose cluster location" "${recommened_regions[@]}")
 
@@ -196,7 +201,7 @@ while [[ -z $VNET_RRSOURCE_GROUP ]]; do
 
         all_vnets_json=$(az network vnet list --query "[?location==\`${CLUSTER_LOCATION}\`].{name:name, resourceGroup:resourceGroup, location:location, id:id}" --output json)
 
-        all_vnets=$(echo "$all_vnets_json" | jq '.[] | "\(.name) [\(.name)|\(.resourceGroup)]"' | sort)
+        all_vnets=$(echo "$all_vnets_json" | jq -r '.[] | "\(.name) [\(.name)|\(.resourceGroup)]"' | sort)
 
         selected_vnet=$(select_item "Select VNET resource group which is located at $CLUSTER_LOCATION. (vnet should be located in the same region of the cluster)" "${all_vnets[@]}")
 
@@ -230,8 +235,9 @@ while [[ -z $VNET_RRSOURCE_GROUP ]]; do
 done
 
 network_plugins=(
-    "Kubenet [kubenet]: Each pod is assigned a logically different IP address from the subnet for simpler setup."
-    "Azure CNI [azure]: Each pod and node is assigned a unique IP for advanced configurations.")
+    "Azure CNI [azure]: Each pod and node is assigned a unique IP for advanced configurations. (Linux & Windows)"
+    "Kubenet [kubenet]: Each pod is assigned a logically different IP address from the subnet for simpler setup. (Linux Only)"
+)
 CLUSTER_NETWORK=$(select_item "Choose cluster network configuration" "${network_plugins[@]}")
 
 log export CLUSTER_NETWORK="$CLUSTER_NETWORK"
@@ -269,33 +275,39 @@ log export SYSTEM_NODE_COUNT="$SYSTEM_NODE_COUNT"
 echo_italic "System node pools count will be $SYSTEM_NODE_COUNT "
 
 system_node_sizes=(
-    "Standard_D4s_v3 [Standard_D4s_v3] - 4 vCPUs & 16 GiB Memory."
-    "Standard DS4 v2 [Standard_DS4_v2] - 8 vCPUs & 28 GiB Memory."
-    "Type another size [_]")
+    "Standard D2ds v5 [Standard_D2ds_v5]   -  2 vCPUs |  8 GiB Memory |  75 GiB SSD Temp Storage"
+    "Standard D4ds v5 [Standard_D4ds_v5]   -  4 vCPUs | 16 GiB Memory | 150 GiB SSD Temp Storage"
+    "Standard D8ds v5 [Standard_D8ds_v5]   -  8 vCPUs | 32 GiB Memory | 300 GiB SSD Temp Storage"
+    "Standard D16ds v5 [Standard_D16ds_v5] - 16 vCPUs | 64 GiB Memory | 600 GiB SSD Temp Storage"
+    "Type another size [_] - https://learn.microsoft.com/en-us/azure/virtual-machines/sizes"
+)
 SYSTEM_NODE_SIZE=$(select_item "What is the system node pools VM Size?" "${system_node_sizes[@]}")
 
 if [ "$SYSTEM_NODE_SIZE" == '_' ]; then
-    SYSTEM_NODE_SIZE=$(input_question "What is the system node pools VM Size?")
+    SYSTEM_NODE_SIZE=$(input_question "What is the system node pools VM Size? (example: Standard_DS4_v2)")
 fi
 
 log export SYSTEM_NODE_SIZE="$SYSTEM_NODE_SIZE"
-echo_italic "System node pools VM Size will be $SYSTEM_NODE_SIZE "
+echo_italic "System node pools VM Size will be $SYSTEM_NODE_SIZE"
 
 echo_green "User node pools serve the primary purpose of ${ANSI_COLOR_CYAN}hosting your application pods.${ANSI_RESET}"
 
 USER_NODE_COUNT=$(input_question "What is the user node pools count? (3 or higher${ANSI_COLOR_CYAN} odd number${ANSI_RESET} is recommended)")
 log export USER_NODE_COUNT="$USER_NODE_COUNT"
 
-echo_italic "User node pools count will be $USER_NODE_COUNT.  "
+echo_italic "User node pools count will be $USER_NODE_COUNT."
 
 user_node_sizes=(
-    "Standard_D8s_v3 [Standard_D8s_v3] - 8 vCPUs & 32 GiB Memory."
-    "Standard_D4s_v3 [Standard_D4s_v3] - 4 vCPUs & 16 GiB Memory."
-    "Type another size [_]")
+    "Standard D2ds v5 [Standard_D2ds_v5]   -  2 vCPUs |  8 GiB Memory |  75 GiB SSD Temp Storage"
+    "Standard D4ds v5 [Standard_D4ds_v5]   -  4 vCPUs | 16 GiB Memory | 150 GiB SSD Temp Storage"
+    "Standard D8ds v5 [Standard_D8ds_v5]   -  8 vCPUs | 32 GiB Memory | 300 GiB SSD Temp Storage"
+    "Standard D16ds v5 [Standard_D16ds_v5] - 16 vCPUs | 64 GiB Memory | 600 GiB SSD Temp Storage"
+    "Type another size [_] - https://learn.microsoft.com/en-us/azure/virtual-machines/sizes"
+)
 USER_NODE_SIZE=$(select_item "What is the system node pools VM Size?" "${user_node_sizes[@]}")
 
 if [ "$USER_NODE_SIZE" == '_' ]; then
-    USER_NODE_SIZE=$(input_question "What is the user node pools VM Size? (example: Standard_D8s_v3)")
+    USER_NODE_SIZE=$(input_question "What is the user node pools VM Size? (example: Standard_D8s_v5)")
 fi
 
 log export USER_NODE_SIZE="$USER_NODE_SIZE"
@@ -341,18 +353,19 @@ if [ "$attach_acr" == 'y' ]; then
     log export ACR_NAME="$ACR_NAME"
 fi
 
-host_windows_node=$(yes_no_question "Would this cluster host Windows Nodes?")
-log export HOST_WINDOWS_NODE="$host_windows_node"
-if [ "$host_windows_node" == 'y' ]; then
-    WINDOWS_NODE_USERNAME=$(input_question "Please provide username for Windows Nodes?")
-    log export WINDOWS_NODE_USERNAME="$WINDOWS_NODE_USERNAME"
+# ask to create windows node pool only if selected Azure CNI
+if [ "$CLUSTER_NETWORK" == 'azure' ]; then
 
-    WINDOWS_NODE_PASSWORD=$(input_question "Please provide password for Windows Nodes?")
-    log export WINDOWS_NODE_PASSWORD="$WINDOWS_NODE_PASSWORD"
+    host_windows_node=$(yes_no_question "Would this cluster host Windows Nodes?")
+    log export HOST_WINDOWS_NODE="$host_windows_node"
+    if [ "$host_windows_node" == 'y' ]; then
+        WINDOWS_NODE_USERNAME=$(input_question "Please provide username for Windows Nodes?")
+        log export WINDOWS_NODE_USERNAME="$WINDOWS_NODE_USERNAME"
+
+        WINDOWS_NODE_PASSWORD=$(input_question "Please provide password for Windows Nodes?")
+        log export WINDOWS_NODE_PASSWORD="$WINDOWS_NODE_PASSWORD"
+    fi
 fi
-
-#echo_italic "sourcing all env vars"
-#source ./"${vars_file}"
 
 start_provision=$(yes_no_question "Start the provisioning process now?")
 
@@ -377,8 +390,8 @@ if [ "$host_windows_node" == 'y' ]; then
         --windows-admin-password "$WINDOWS_NODE_PASSWORD" \
         --network-plugin azure \
         --vnet-subnet-id "$SUBNET_ID" \
-        --service-cidr 172.171.0.0/16 \
-        --dns-service-ip 172.171.0.10 \
+        --service-cidr $services_cidr \
+        --dns-service-ip $dns_service_ip \
         --enable-aad \
         --aad-admin-group-object-ids "$AAD_GROUP_ID" \
         --aad-tenant-id "$TENANT_ID" \
@@ -401,8 +414,9 @@ else
         --vm-set-type VirtualMachineScaleSets \
         --network-plugin "$CLUSTER_NETWORK" \
         --vnet-subnet-id "$SUBNET_ID" \
-        --service-cidr 172.171.0.0/16 \
-        --dns-service-ip 172.171.0.10 \
+        --pod-cidr $pod_cidr \
+        --service-cidr $services_cidr \
+        --dns-service-ip $dns_service_ip \
         --enable-aad \
         --aad-admin-group-object-ids "$AAD_GROUP_ID" \
         --aad-tenant-id "$TENANT_ID" \
