@@ -397,6 +397,10 @@ if [ "$CLUSTER_NETWORK" == 'azure' ]; then
     fi
 fi
 
+echo_green "KEDA is a Kubernetes-based Event Driven Autoscaler. With KEDA, you can drive the scaling of any container in Kubernetes based on the number of events needing to be processed."
+echo_green "More info can be found at: https://keda.sh/"
+install_keda=$(yes_no_question "Do you want to install KEDA on $CLUSTER_NAME system node pool once created?")
+
 start_provision=$(yes_no_question "Start the provisioning process now?")
 
 if [ "$start_provision" == 'n' ]; then
@@ -427,6 +431,7 @@ if [ "$host_windows_node" == 'y' ]; then
         --aad-tenant-id "$TENANT_ID" \
         --enable-managed-identity \
         --assign-identity "$MANAGED_IDENTITY_ID" \
+        --enable-oidc-issuer \
         --kubernetes-version "$K8S_VERSION" \
         --nodepool-name "$SYSTEMPOOL_NAME" \
         --os-sku "$OS_SKU" \
@@ -453,6 +458,7 @@ else
             --aad-admin-group-object-ids "$AAD_GROUP_ID" \
             --aad-tenant-id "$TENANT_ID" \
             --enable-managed-identity \
+            --enable-oidc-issuer \
             --assign-identity "$MANAGED_IDENTITY_ID" \
             --kubernetes-version "$K8S_VERSION" \
             --nodepool-name "$SYSTEMPOOL_NAME" \
@@ -481,6 +487,7 @@ else
             --aad-tenant-id "$TENANT_ID" \
             --enable-managed-identity \
             --assign-identity "$MANAGED_IDENTITY_ID" \
+            --enable-oidc-issuer \
             --kubernetes-version "$K8S_VERSION" \
             --nodepool-name "$SYSTEMPOOL_NAME" \
             --os-sku "$OS_SKU" \
@@ -511,15 +518,28 @@ if [ $? -eq 0 ]; then
         echo_italic "Skipping attaching Azure Container Registry to the cluster."
     fi
 
+    oidc_url=$(az aks show -g "$CLUSTER_RESOURCE_GRPUP" -n "$CLUSTER_NAME" --query "oidcIssuerProfile.issuerUrl" -o tsv)
     echo_green "Congratulation you have created Managed AAD Cluster with Managed Identity"
 
     echo_cyan "Variables log filenem: $vars_file"
 
     if [ $? -eq 0 ]; then
+
+        echo_green "Cluster Details: "
+        echo_lightgreen "Name: $CLUSTER_NAME"
+        echo_lightgreen "Resource Group: $CLUSTER_RESOURCE_GRPUP"
+        echo_lightgreen "OIDC Issuer URL: $oidc_url"
+
         echo_green "Logging into Cluster Now... "
 
         az aks get-credentials --name "$CLUSTER_NAME" --resource-group "$CLUSTER_RESOURCE_GRPUP" --overwrite-existing --admin
         kubelogin convert-kubeconfig -l azurecli
+
+        if [ "$install_keda" == 'y' ]; then
+            helm repo add kedacore https://kedacore.github.io/charts
+            helm repo update
+            helm install keda kedacore/keda --namespace keda --create-namespace --set nodeSelector."kubernetes\.azure\.com/mode"=system
+        fi
 
         echo_green "Listing all deployments in all namespaces"
         kubectl get deployments --all-namespaces=true -o wide
