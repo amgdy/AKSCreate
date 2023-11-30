@@ -14,12 +14,16 @@ WORKERPOOL_NAME=usrpool001
 TIMESTAMP=$(date +"%y%m%d-%H%M%S")
 vars_file="vars-$TIMESTAMP.txt"
 
-pod_cidr='10.10.0.0/16'
-services_cidr='10.0.0.0/16'
-dns_service_ip='10.0.0.10'
+pod_cidr='172.16.0.0/16'
+services_cidr='172.17.0.0/16'
+dns_service_ip='172.17.0.10'
+
+function echo_lightgreen() {
+    echo -e "${ANSI_COLOR_GREEN_LIGHT}$*${ANSI_RESET}"
+}
 
 function echo_green() {
-    echo -e "${ANSI_COLOR_GREEN_LIGHT}$*${ANSI_RESET}"
+    echo -e "${ANSI_COLOR_GREEN}$*${ANSI_RESET}"
 }
 
 function echo_cyan() {
@@ -151,9 +155,12 @@ echo_green "We're using the following subscription" && echo ""
 az account show --query "{subscriptionName:name, subscriptionId:id}" --output table
 
 echo ""
+echo_green "Cluster Name"
+
 CLUSTER_NAME=$(input_question "Please enter the name of the cluster")
 log export CLUSTER_NAME="$CLUSTER_NAME"
 
+echo_green "Cluster Location (Region)"
 recommened_regions=(
     "(Europe) North Europe [northeurope]"
     "(Europe) West Europe [westeurope]"
@@ -174,6 +181,8 @@ log export CLUSTER_LOCATION="$CLUSTER_LOCATION"
 all_resourceGroups=$(az group list --query '[].{name:name, location:location}' --output tsv | awk '{print "[" $1 "] (" $2 ") "}' | sort)
 ifs_current=$IFS && IFS=$'\n' all_resourceGroups=($all_resourceGroups) && IFS=$ifs_current
 
+echo_green "Cluster Network Connectivity"
+
 VNET_RRSOURCE_GROUP=
 while [[ -z $VNET_RRSOURCE_GROUP ]]; do
 
@@ -185,6 +194,7 @@ while [[ -z $VNET_RRSOURCE_GROUP ]]; do
 
     if [ "$VNET_INPUT" == 'new' ]; then
 
+        echo_lightgreen "Creating a new virual network"
         VNET_RRSOURCE_GROUP=$(select_item "Select vnet resource group" "${all_resourceGroups[@]}")
         log export VNET_RRSOURCE_GROUP="$VNET_RRSOURCE_GROUP"
 
@@ -198,7 +208,7 @@ while [[ -z $VNET_RRSOURCE_GROUP ]]; do
         log export SUBNET_ID="$SUBNET_ID"
         echo_green "Subnet $SUBNET_ID has been created!... "
     else
-
+        echo_lightgreen "Using an existing virtual network"
         all_vnets_json=$(az network vnet list --query "[?location==\`${CLUSTER_LOCATION}\`].{name:name, resourceGroup:resourceGroup, location:location, id:id}" --output json)
 
         all_vnets=$(echo "$all_vnets_json" | jq -r '.[] | "\(.name) [\(.name)|\(.resourceGroup)]"' | sort)
@@ -234,11 +244,27 @@ while [[ -z $VNET_RRSOURCE_GROUP ]]; do
     fi
 done
 
+echo_green "Cluster Network Plugin"
+
 network_plugins=(
     "Azure CNI [azure]: Each pod and node is assigned a unique IP for advanced configurations. (Linux & Windows)"
     "Kubenet [kubenet]: Each pod is assigned a logically different IP address from the subnet for simpler setup. (Linux Only)"
 )
 CLUSTER_NETWORK=$(select_item "Choose cluster network configuration" "${network_plugins[@]}")
+
+if [ "$CLUSTER_NETWORK" == 'kubenet' ]; then
+    echo_green "Cluster Pods CIDR for kubenet network plugin"
+    POD_CIDR=$(input_question "What is the group name to use? (Example: ${pod_cidr})")
+    log export POD_CIDR="$POD_CIDR"
+fi
+
+echo_green "Kubernetes service address range. A CIDR notation IP range from which to assign service cluster IPs. It must not overlap with any Subnet IP ranges."
+SERVICES_CIDR=$(input_question "What is the service CIDR to use? (Example: ${services_cidr})")
+log export SERVICES_CIDR="$SERVICES_CIDR"
+
+echo_green "Kubernetes DNS service IP address. An IP address assigned to the Kubernetes DNS service. It must be within the Kubernetes service address range."
+DNS_SERVICE_IP=$(input_question "What is the DNS service IP to use? (Example: ${dns_service_ip})")
+log export DNS_SERVICE_IP="$DNS_SERVICE_IP"
 
 log export CLUSTER_NETWORK="$CLUSTER_NETWORK"
 
@@ -246,6 +272,9 @@ echo_green "Getting tenant ID... "
 TENANT_ID=$(az account show --query tenantId -o tsv)
 log export TENANT_ID="$TENANT_ID"
 
+echo_lightgreen "Using Tenant ID: $TENANT_ID"
+
+echo_green "Cluster RBAC Access Control"
 is_aad_group_created=$(yes_no_question "Do you have an existing Entra ID (Azure AD) Group to use?")
 
 if [ "$is_aad_group_created" == 'y' ]; then
@@ -263,21 +292,21 @@ else
         --display-name "$aad_new_group_name" \
         --mail-nickname "$aad_new_group_name" \
         --query id -o tsv)
-    echo_green "AD Group $aad_new_group_name has been created !"
+    echo_lightgreen "AD Group $aad_new_group_name has been created !"
     log export AAD_GROUP_ID="$AAD_GROUP_ID"
 fi
 
-echo_green "Now let's configure System and User node pools for the cluster: "
-echo_green "System node pools serve the primary purpose of hosting critical ${ANSI_COLOR_CYAN}system pods${ANSI_COLOR_GREEN_LIGHT} such as CoreDNS, konnectivity, metrics-server... "
+echo_green "Cluster SYSTEM and USER node pools"
+echo_lightgreen "System node pools serve the primary purpose of hosting critical ${ANSI_COLOR_CYAN}system pods${ANSI_COLOR_GREEN_LIGHT} such as CoreDNS, konnectivity, metrics-server... "
 
 SYSTEM_NODE_COUNT=$(input_question "What is the count of System node pools? (2 or higher is recommended)")
 log export SYSTEM_NODE_COUNT="$SYSTEM_NODE_COUNT"
 echo_italic "System node pools count will be $SYSTEM_NODE_COUNT "
 
 system_node_sizes=(
-    "Standard D2ds v5 [Standard_D2ds_v5]   -  2 vCPUs |  8 GiB Memory |  75 GiB SSD Temp Storage"
-    "Standard D4ds v5 [Standard_D4ds_v5]   -  4 vCPUs | 16 GiB Memory | 150 GiB SSD Temp Storage"
-    "Standard D8ds v5 [Standard_D8ds_v5]   -  8 vCPUs | 32 GiB Memory | 300 GiB SSD Temp Storage"
+    "Standard  D2ds v5  [Standard_D2ds_v5] -  2 vCPUs |  8 GiB Memory |  75 GiB SSD Temp Storage"
+    "Standard  D4ds v5  [Standard_D4ds_v5] -  4 vCPUs | 16 GiB Memory | 150 GiB SSD Temp Storage"
+    "Standard  D8ds v5  [Standard_D8ds_v5] -  8 vCPUs | 32 GiB Memory | 300 GiB SSD Temp Storage"
     "Standard D16ds v5 [Standard_D16ds_v5] - 16 vCPUs | 64 GiB Memory | 600 GiB SSD Temp Storage"
     "Type another size [_] - https://learn.microsoft.com/en-us/azure/virtual-machines/sizes"
 )
@@ -290,7 +319,7 @@ fi
 log export SYSTEM_NODE_SIZE="$SYSTEM_NODE_SIZE"
 echo_italic "System node pools VM Size will be $SYSTEM_NODE_SIZE"
 
-echo_green "User node pools serve the primary purpose of ${ANSI_COLOR_CYAN}hosting your application pods.${ANSI_RESET}"
+echo_lightgreen "User node pools serve the primary purpose of ${ANSI_COLOR_CYAN}hosting your application pods.${ANSI_RESET}"
 
 USER_NODE_COUNT=$(input_question "What is the user node pools count? (3 or higher${ANSI_COLOR_CYAN} odd number${ANSI_RESET} is recommended)")
 log export USER_NODE_COUNT="$USER_NODE_COUNT"
@@ -298,9 +327,9 @@ log export USER_NODE_COUNT="$USER_NODE_COUNT"
 echo_italic "User node pools count will be $USER_NODE_COUNT."
 
 user_node_sizes=(
-    "Standard D2ds v5 [Standard_D2ds_v5]   -  2 vCPUs |  8 GiB Memory |  75 GiB SSD Temp Storage"
-    "Standard D4ds v5 [Standard_D4ds_v5]   -  4 vCPUs | 16 GiB Memory | 150 GiB SSD Temp Storage"
-    "Standard D8ds v5 [Standard_D8ds_v5]   -  8 vCPUs | 32 GiB Memory | 300 GiB SSD Temp Storage"
+    "Standard  D2ds v5  [Standard_D2ds_v5] -  2 vCPUs |  8 GiB Memory |  75 GiB SSD Temp Storage"
+    "Standard  D4ds v5  [Standard_D4ds_v5] -  4 vCPUs | 16 GiB Memory | 150 GiB SSD Temp Storage"
+    "Standard  D8ds v5  [Standard_D8ds_v5] -  8 vCPUs | 32 GiB Memory | 300 GiB SSD Temp Storage"
     "Standard D16ds v5 [Standard_D16ds_v5] - 16 vCPUs | 64 GiB Memory | 600 GiB SSD Temp Storage"
     "Type another size [_] - https://learn.microsoft.com/en-us/azure/virtual-machines/sizes"
 )
@@ -313,37 +342,38 @@ fi
 log export USER_NODE_SIZE="$USER_NODE_SIZE"
 echo_italic "User node pools VM Size will be $USER_NODE_SIZE"
 
+echo_green "Cluster kubernetes version"
 location_k8s_versions=$(az aks get-versions --location "$CLUSTER_LOCATION" --output json --query 'values[?isPreview == `null`].patchVersions[].keys(@)[]' | jq -r '.[] | "[\(.)]"' | sort -r)
 ifs_current=$IFS && IFS=$'\n' location_k8s_versions=($location_k8s_versions) && IFS=$ifs_current
 K8S_VERSION=$(select_item "Select the kubernetes version from ${CLUSTER_LOCATION} available versions" "${location_k8s_versions[@]}")
-
-#K8S_VERSION=$(input_question "Specify kubernetes version for the cluster: (Example: $k8s_highest_version)")
 log export K8S_VERSION="$K8S_VERSION"
 
 CLUSTER_RESOURCE_GRPUP=$(select_item "Select cluster resource group" "${all_resourceGroups[@]}")
-#CLUSTER_RESOURCE_GRPUP=$(input_question "What is the Resource Group for the Cluster?")
 log export CLUSTER_RESOURCE_GRPUP="$CLUSTER_RESOURCE_GRPUP"
 
-echo_green "We will User-assigned Managed Identity for the cluster"
+echo_green "Cluster Managed Identity"
+echo_lightgreen "We will User-assigned Managed Identity for the cluster"
 managed_identity_name=$(input_question "What is the name of your Managed Identity to use/create ?")
 
 MANAGED_IDENTITY_ID=$(az identity create --name "$managed_identity_name" --resource-group "$CLUSTER_RESOURCE_GRPUP" --query "id" | tr -d '"')
 log export MANAGED_IDENTITY_ID="$MANAGED_IDENTITY_ID"
 
+echo_green "Cluster host OS"
 os_skus=(
     "Azure Linux [AzureLinux] - RECOMMENDED."
     "Ubuntu [ubuntu].")
 OS_SKU=$(select_item "Choose cluster host OS" "${os_skus[@]}")
 log export OS_SKU="$OS_SKU"
 
+echo_green "Cluster price and SLA tier"
 cluster_tiers=(
     "Standard [standard] - RECOMMENDED."
     "Free [free] - NO financially backed API server uptime SLA!"
 )
-
 CLUSTER_TIER=$(select_item "Choose cluster pricing tier" "${cluster_tiers[@]}")
 log export CLUSTER_TIER="$CLUSTER_TIER"
 
+echo_green "Cluster connected Container Registry"
 attach_acr=$(yes_no_question "Do you want to Attach Azure Container Registry to the cluster ?")
 
 if [ "$attach_acr" == 'y' ]; then
@@ -374,10 +404,10 @@ if [ "$start_provision" == 'n' ]; then
     exit 0
 fi
 
-echo_green "Starting the provisioning process..."
+echo_lightgreen "Starting the provisioning process..."
 
 if [ "$host_windows_node" == 'y' ]; then
-    echo_green "Creating Windows-based Cluster..."
+    echo_lightgreen "Creating Windows-based Cluster..."
     az aks create \
         --resource-group "$CLUSTER_RESOURCE_GRPUP" \
         --name "$CLUSTER_NAME" \
@@ -403,7 +433,7 @@ if [ "$host_windows_node" == 'y' ]; then
         --tier "$CLUSTER_TIER"
 
 else
-    echo_green "Creating Linux-based Cluster... "
+    echo_lightgreen "Creating Linux-based Cluster... "
 
     case "$CLUSTER_NETWORK" in
     azure)
@@ -417,8 +447,8 @@ else
             --vm-set-type VirtualMachineScaleSets \
             --network-plugin "$CLUSTER_NETWORK" \
             --vnet-subnet-id "$SUBNET_ID" \
-            --service-cidr $services_cidr \
-            --dns-service-ip $dns_service_ip \
+            --service-cidr "$SERVICES_CIDR" \
+            --dns-service-ip "$DNS_SERVICE_IP" \
             --enable-aad \
             --aad-admin-group-object-ids "$AAD_GROUP_ID" \
             --aad-tenant-id "$TENANT_ID" \
@@ -443,9 +473,9 @@ else
             --vm-set-type VirtualMachineScaleSets \
             --network-plugin "$CLUSTER_NETWORK" \
             --vnet-subnet-id "$SUBNET_ID" \
-            --pod-cidr $pod_cidr \
-            --service-cidr $services_cidr \
-            --dns-service-ip $dns_service_ip \
+            --pod-cidr "$POD_CIDR" \
+            --service-cidr "$SERVICES_CIDR" \
+            --dns-service-ip "$DNS_SERVICE_IP" \
             --enable-aad \
             --aad-admin-group-object-ids "$AAD_GROUP_ID" \
             --aad-tenant-id "$TENANT_ID" \
@@ -460,7 +490,7 @@ else
 fi
 
 if [ $? -eq 0 ]; then
-    echo_green "Adding User Node Pool ${ANSI_COLOR_CYAN}$WORKERPOOL_NAME${ANSI_COLOR_GREEN_LIGHT} to the cluster... "
+    echo_lightgreen "Adding User Node Pool ${ANSI_COLOR_CYAN}$WORKERPOOL_NAME${ANSI_COLOR_GREEN_LIGHT} to the cluster... "
 
     az aks nodepool add \
         --cluster-name "$CLUSTER_NAME" \
@@ -473,7 +503,6 @@ if [ $? -eq 0 ]; then
         --os-sku "$OS_SKU"
 
     echo_green "Congratulation AKS Cluster ${ANSI_COLOR_CYAN}$CLUSTER_NAME${ANSI_COLOR_GREEN_LIGHT} has been created! "
-    echo_green "Congratulation you have created Managed AAD Cluster with Managed Identity"
 
     if [ "$attach_acr" == 'y' ]; then
         echo_green "Attaching $ACR_NAME Azure Container Registry to the cluster"
@@ -481,6 +510,8 @@ if [ $? -eq 0 ]; then
     else
         echo_italic "Skipping attaching Azure Container Registry to the cluster."
     fi
+
+    echo_green "Congratulation you have created Managed AAD Cluster with Managed Identity"
 
     echo_cyan "Variables log filenem: $vars_file"
 
