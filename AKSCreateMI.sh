@@ -259,7 +259,7 @@ if [ "$CLUSTER_NETWORK" == 'kubenet' ]; then
 fi
 
 echo_green "Kubernetes service address range. A CIDR notation IP range from which to assign service cluster IPs. It must not overlap with any Subnet IP ranges."
-SERVICES_CIDR=$(input_question "What is the service CIDR to use? (Example: ${services_cidr})")
+SERVICES_CIDR=$(input_question "What is the services CIDR to use? (Example: ${services_cidr})")
 log export SERVICES_CIDR="$SERVICES_CIDR"
 
 echo_green "Kubernetes DNS service IP address. An IP address assigned to the Kubernetes DNS service. It must be within the Kubernetes service address range."
