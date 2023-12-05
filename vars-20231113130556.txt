@@ -1,2 +1,0 @@
---export CLUSTER_NAME=sdfsafsadfsda
-export CLUSTER_LOCATION=sdfsad

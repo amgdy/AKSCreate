@@ -1,2 +1,0 @@
---export
-export CLUSTER_LOCATION=ddd
