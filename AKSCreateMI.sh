@@ -12,7 +12,7 @@ ANSI_BOLD=$'\e[1m'
 SYSTEMPOOL_NAME=syspool001
 WORKERPOOL_NAME=usrpool001
 TIMESTAMP=$(date +"%y%m%d-%H%M%S")
-vars_file="vars-$TIMESTAMP.txt"
+vars_file="logs/vars-$TIMESTAMP.txt"
 
 pod_cidr='172.16.0.0/16'
 services_cidr='172.17.0.0/16'
@@ -126,6 +126,8 @@ function convert_to_array() {
     echo "${result_array[@]}"
 }
 
+mkdir -p logs
+
 if [ -n "$1" ]; then
     vars_file=$1
 fi
@@ -212,6 +214,7 @@ while [[ -z $VNET_RRSOURCE_GROUP ]]; do
         all_vnets_json=$(az network vnet list --query "[?location==\`${CLUSTER_LOCATION}\`].{name:name, resourceGroup:resourceGroup, location:location, id:id}" --output json)
 
         all_vnets=$(echo "$all_vnets_json" | jq -r '.[] | "\(.name) [\(.name)|\(.resourceGroup)]"' | sort)
+        ifs_current=$IFS && IFS=$'\n' all_vnets=($all_vnets) && IFS=$ifs_current
 
         selected_vnet=$(select_item "Select VNET resource group which is located at $CLUSTER_LOCATION. (vnet should be located in the same region of the cluster)" "${all_vnets[@]}")
 
