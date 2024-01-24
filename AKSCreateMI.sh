@@ -443,13 +443,16 @@ if [ "$USER_NODE_COUNT" -gt 0 ]; then
     workerpool_params+=(--node-vm-size "$USER_NODE_SIZE")
 
     echo_green "User Node Pool host OS"
-    usrpool_os_skus=(
-        "Azure Linux [AzureLinux] - RECOMMENDED Linux."
-        "Ubuntu [ubuntu].")
+    usrpool_os_skus=()
 
     if [ "$GPU_ENABLED" == 'y' ]; then
         echo_cyan "AKS does not support Windows GPU-enabled node pools."
+        echo_cyan "AzureLinux (CBLMariner) does not currently support UseGPUDedicatedVHD."
+        usrpool_os_skus+=("Ubuntu [ubuntu].")
     else
+        usrpool_os_skus+=("Azure Linux [AzureLinux] - RECOMMENDED Linux.")
+        usrpool_os_skus+=("Ubuntu [ubuntu].")
+
         if [ "$CLUSTER_NETWORK" == 'kubenet' ]; then
             echo_cyan "You can't create Windows node pool with Kubenet network plugin."
         else
