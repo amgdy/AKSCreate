@@ -447,11 +447,15 @@ if [ "$USER_NODE_COUNT" -gt 0 ]; then
         "Azure Linux [AzureLinux] - RECOMMENDED Linux."
         "Ubuntu [ubuntu].")
 
-    if [ "$CLUSTER_NETWORK" == 'kubenet' ]; then
-        echo_cyan "You can't create Windows node pool with Kubenet network plugin."
+    if [ "$GPU_ENABLED" == 'y' ]; then
+        echo_cyan "AKS does not support Windows GPU-enabled node pools."
     else
-        usrpool_os_skus+=("Windows Server 2022 [Windows2022] - RECOMMENDED Windows.")
-        usrpool_os_skus+=("Windows Server 2019 [Windows2019].")
+        if [ "$CLUSTER_NETWORK" == 'kubenet' ]; then
+            echo_cyan "You can't create Windows node pool with Kubenet network plugin."
+        else
+            usrpool_os_skus+=("Windows Server 2022 [Windows2022] - RECOMMENDED Windows.")
+            usrpool_os_skus+=("Windows Server 2019 [Windows2019].")
+        fi
     fi
 
     USRPOOL_OS_SKU=$(select_item "Choose user node pool host OS" "${usrpool_os_skus[@]}")
