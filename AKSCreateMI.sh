@@ -6,6 +6,7 @@ ANSI_COLOR_GREEN=$'\e[0;32m'
 ANSI_COLOR_GREEN_LIGHT=$'\e[0;92m'
 ANSI_COLOR_RED=$'\e[31m'
 ANSI_COLOR_CYAN=$'\e[0;36m'
+ANSI_COLOR_YELLOW=$'\e[0;33m'
 ANSI_RESET=$'\e[0m'
 ANSI_ITALIC=$'\e[3m'
 ANSI_BOLD=$'\e[1m'
@@ -37,6 +38,11 @@ function echo_cyan() {
 
 function echo_red() {
     echo -e "${ANSI_COLOR_RED}$*${ANSI_RESET}"
+}
+
+function echo_yellow() {
+    local message="$*"
+    echo -e "${ANSI_COLOR_YELLOW}${message}${ANSI_RESET}"
 }
 
 function echo_italic() {
@@ -230,18 +236,11 @@ ifs_current=$IFS && IFS=$'\n' all_resourceGroups=($all_resourceGroups) && IFS=$i
 CLUSTER_RESOURCE_GROUP=$(select_item "Please select the resource group for the cluster" "${all_resourceGroups[@]}")
 log export CLUSTER_RESOURCE_GROUP="$CLUSTER_RESOURCE_GROUP"
 cluster_params+=(--resource-group "$CLUSTER_RESOURCE_GROUP")
-echo_bold "Networking"
-
-private_cluster=$(yes_no_question "Do you want to enable a private cluster to restrict worker node to API access for $CLUSTER_NAME?")
-if [ "$private_cluster" == 'y' ]; then
-    cluster_params+=(--enable-private-cluster)
-    echo_lightgreen "Private AKS clusters do not have their API server accessible from the public internet. To access the private cluster, deploy it into a virtual network that is accessible from your computer or follow the AKS private cluster documentation."
-fi
 
 echo_green "Cluster Network Connectivity"
 
-VNET_RESOURCE_GROUP=
-while [[ -z $VNET_RESOURCE_GROUP ]]; do
+SUBNET_ID=
+while [[ -z $SUBNET_ID ]]; do
 
     vnet_inputs=(
         "Create a new Virtual Network [new]."
@@ -255,17 +254,25 @@ while [[ -z $VNET_RESOURCE_GROUP ]]; do
         VNET_RESOURCE_GROUP=$(select_item "Please select the resource group for the Virtual Network" "${all_resourceGroups[@]}")
         log export VNET_RESOURCE_GROUP="$VNET_RESOURCE_GROUP"
 
-        VNET_NAME=$(input_question "Please provide the name for the Virtual Network")
+        VNET_NAME=$(input_question "Please provide the name for the Virtual Network (Example: vnet-aks-enu-01)")
         log export VNET_NAME="$VNET_NAME"
-        subnet_address_prefix=$(input_question "Please provide the address prefix for the subnet (Example: 10.179.128.0/21)")
-        echo_green "Creating subnet for the AKS cluster... "
-        VNET_ID=$(az network vnet show --resource-group "$VNET_RESOURCE_GROUP" --name "$VNET_NAME" --query id -o tsv)
-        log export VNET_ID="$VNET_ID"
-        SUBNET_ID=$(az network vnet subnet create -n aks-subnet -g "$VNET_RESOURCE_GROUP" --vnet-name "$VNET_NAME" --address-prefix "$subnet_address_prefix" --query "id" -o tsv)
+
+        SUBNET_NAME=$(input_question "Please provide the name for the Subnet (Example: snet-aks-01)")
+        log export SUBNET_NAME="$SUBNET_NAME"
+
+        vnet_address_space=$(input_question "Please provide the address space for the virtual network (Example: 10.200.0.0/16)")
+        log export vnet_address_space="$vnet_address_space"
+
+        subnet_address_prefix=$(input_question "Please provide the address prefix for the subnet (Example: 10.200.1.0/24)")
+        log export subnet_address_prefix="$subnet_address_prefix"
+
+        echo_green "Creating the virtual network and the subnet for the AKS cluster... "
+        SUBNET_ID=$(az network vnet create --name "$VNET_NAME" --resource-group "$VNET_RESOURCE_GROUP" --address-prefix "$vnet_address_space" --subnet-name "$SUBNET_NAME" --subnet-prefixes "$subnet_address_prefix" --query 'newVNet.subnets[0].id' -o json | tr -d '"')
         log export SUBNET_ID="$SUBNET_ID"
         echo_green "Subnet $SUBNET_ID has been successfully created!... "
     else
         echo_lightgreen "Utilizing an existing Virtual Network"
+
         all_vnets_json=$(az network vnet list --query "[?location==\`${CLUSTER_LOCATION}\`].{name:name, resourceGroup:resourceGroup, location:location, id:id}" --output json)
 
         all_vnets=$(echo "$all_vnets_json" | jq -r '.[] | "\(.name) [\(.name)|\(.resourceGroup)]"' | sort)
@@ -274,7 +281,7 @@ while [[ -z $VNET_RESOURCE_GROUP ]]; do
         selected_vnet=$(select_item "Please select the Virtual Network resource group located at $CLUSTER_LOCATION. (The Virtual Network should be located in the same region as the cluster)" "${all_vnets[@]}")
 
         if [[ -z $selected_vnet ]]; then
-            echo "It appears you do not have Virtual Networks for the selected region: ${CLUSTER_LOCATION}. Please try again." >&2
+            echo_yellow "It appears you do not have Virtual Networks for the selected region: ${CLUSTER_LOCATION}. Please try again." >&2
             continue
         fi
 
@@ -290,6 +297,11 @@ while [[ -z $VNET_RESOURCE_GROUP ]]; do
         all_subnets=$(az network vnet subnet list --resource-group "$VNET_RESOURCE_GROUP" --vnet-name "$VNET_NAME" --query '[].{name:name, addressPrefix:addressPrefix}' -o tsv | awk '{print "[" $1 "] (" $2 ")" }')
         ifs_current=$IFS && IFS=$'\n' all_subnets=($all_subnets) && IFS=$ifs_current
 
+        if [ -z "${all_subnets[*]}" ]; then
+            echo_yellow "It appears you do not have any subnets in the selected Virtual Network $VNET_NAME. Please create the subnet and try again." >&2
+            continue
+        fi
+
         SUBNET_NAME=$(select_item "Please select the subnet" "${all_subnets[@]}")
 
         SUBNET_ID=$(az network vnet subnet show --resource-group "$VNET_RESOURCE_GROUP" --vnet-name "$VNET_NAME" --name "$SUBNET_NAME" --query id -o tsv)
@@ -299,14 +311,16 @@ while [[ -z $VNET_RESOURCE_GROUP ]]; do
         log export VNET_RESOURCE_GROUP="$VNET_RESOURCE_GROUP"
         log export SUBNET_NAME="$SUBNET_NAME"
         log export SUBNET_ID="$SUBNET_ID"
+
+        echo_green "Selected Subnet id $SUBNET_ID"
     fi
 done
 echo_green "Cluster Network Plugin"
 
 network_plugins=(
-    "Azure CNI [azure]: Assigns a unique IP to each pod and node for advanced configurations (Linux & Windows)."
-    "Kubenet [kubenet]: Assigns a logically different IP address from the subnet to each pod for simpler setup (Linux Only)."
-    "Azure CNI Overlay [overlay]: Assigns IP addresses from a private CIDR logically different from the VNet to each pod (Linux & Windows). Offers better performance and Azure Network Policies support over kubenet."
+    "[kubenet] Kubenet: Assigns a logically different IP address from the subnet to each pod for simpler setup (Linux Only)."
+    "[azure]   Azure CNI: Assigns a unique IP to each pod and node for advanced configurations (Linux & Windows)."
+    "[overlay] Azure CNI Overlay: Assigns IP addresses from a private CIDR logically different from the VNet to each pod (Linux & Windows). Offers better performance and Azure Network Policies support over kubenet."
 )
 CLUSTER_NETWORK=$(select_item "Please select the desired cluster network configuration" "${network_plugins[@]}")
 
@@ -351,6 +365,12 @@ overlay)
     ;;
 esac
 
+private_cluster=$(yes_no_question "Do you want to enable a private cluster to restrict worker node to API access for cluster: $CLUSTER_NAME?")
+if [ "$private_cluster" == 'y' ]; then
+    cluster_params+=(--enable-private-cluster)
+    echo_lightgreen "Private AKS clusters do not have their API server accessible from the public internet. To access the private cluster, deploy it into a virtual network that is accessible from your computer or follow the AKS private cluster documentation."
+fi
+
 echo_green "Retrieving tenant ID... "
 TENANT_ID=$(az account show --query tenantId -o tsv)
 log export TENANT_ID="$TENANT_ID"
@@ -361,11 +381,19 @@ echo_green "Enabling Entra ID (Azure AD) Authentication with Kubernetes RBAC"
 echo_lightgreen "Configuring Cluster admin ClusterRoleBinding. Please note that Kubernetes local accounts will be enabled by default."
 aad_group_status=$(yes_no_question "Do you have an existing Azure AD Group to utilize?")
 if [ "$aad_group_status" == 'y' ]; then
-    aad_group_name=$(input_question "Please provide the name of the group to use.")
-    log export AAD_GROUP_NAME="$aad_group_name"
+    while true; do
+        aad_group_name=$(input_question "Please provide the name of the group to use.")
+        log export AAD_GROUP_NAME="$aad_group_name"
 
-    AAD_GROUP_ID=$(az ad group show -g "$aad_group_name" --query id -o tsv)
-    log export AAD_GROUP_ID="$AAD_GROUP_ID"
+        AAD_GROUP_ID=$(az ad group show -g "$aad_group_name" --query id -o tsv)
+
+        if [[ -n $AAD_GROUP_ID ]]; then
+            log export AAD_GROUP_ID="$AAD_GROUP_ID"
+            break
+        else
+            echo "It appears the group name you provided does not exist. Please try again." >&2
+        fi
+    done
 else
     aad_group_name_new=$(input_question "Please provide the name of the group to create.")
     log export AAD_NEW_GROUP_NAME="$aad_group_name_new"
@@ -499,7 +527,7 @@ cluster_params+=(--enable-managed-identity --assign-identity "$MANAGED_IDENTITY_
 
 echo_green "Kubernetes Version for the Cluster"
 echo_lightgreen "You will need to select a Kubernetes version from the available versions in your specified location."
-location_k8s_versions=($(az aks get-versions --location "$CLUSTER_LOCATION" --output json --query 'values[?isPreview == `null`].patchVersions[].keys(@)[]' | jq -c '.[] | "[\(.)]"' | sort -r | tr "\n" " "))
+location_k8s_versions=($(az aks get-versions --location "$CLUSTER_LOCATION" --output json --query 'values[?isPreview == `null`].patchVersions[].keys(@)[] | sort(@)[::-1]' | jq -c '.[] | "[" + . + "]"' | tr -d '"'))
 K8S_VERSION=$(select_item "Select the kubernetes version from ${CLUSTER_LOCATION} available versions" "${location_k8s_versions[@]}")
 log export K8S_VERSION="$K8S_VERSION"
 cluster_params+=(--kubernetes-version "$K8S_VERSION")
@@ -563,6 +591,8 @@ fi
 
 echo_lightgreen "Initiating the provisioning process..."
 
+start_time=$(date +%s)
+
 create_command="az aks create ${cluster_params[@]} ${network_params[@]}"
 
 echo "Executing: $create_command" >&2
@@ -579,6 +609,9 @@ if [ $? -eq 0 ]; then
         az aks nodepool add "${workerpool_params[@]}"
     fi
 
+    end_time=$(date +%s)
+    execution_time=$((end_time - start_time))
+    echo "Provisioning duration: $execution_time seconds"
     echo_green "Success! AKS Cluster ${ANSI_COLOR_CYAN}$CLUSTER_NAME${ANSI_COLOR_GREEN_LIGHT} has been created! "
     echo_cyan "Log file: $vars_file"
 
@@ -591,13 +624,20 @@ if [ $? -eq 0 ]; then
         echo_lightgreen "OIDC Issuer URL: $oidc_url"
     fi
 
+    echo_green "API Server FQDN: $(az aks show -g "$CLUSTER_RESOURCE_GROUP" -n "$CLUSTER_NAME" --query "fqdn" -o tsv)"
+    if [ "$private_cluster" == 'y' ]; then
+        echo_green "Private API Server FQDN: $(az aks show -g "$CLUSTER_RESOURCE_GROUP" -n "$CLUSTER_NAME" --query "privateFqdn" -o tsv)"
+    fi
+
     echo_green "You have successfully created a Managed Cluster with Managed Identity."
+
     echo_green "Proceeding to log into the Cluster... "
 
-    az aks get-credentials --name "$CLUSTER_NAME" --resource-group "$CLUSTER_RESOURCE_GROUP" --overwrite-existing --admin
+    az aks get-credentials --resource-group "$CLUSTER_RESOURCE_GROUP" --name "$CLUSTER_NAME" --overwrite-existing --admin
     kubelogin convert-kubeconfig -l azurecli
     echo_green "Listing all deployments across all namespaces"
-    kubectl get deployments --all-namespaces=true -o wide
+
+    az aks command invoke --resource-group "$CLUSTER_RESOURCE_GROUP" --name "$CLUSTER_NAME" --command "kubectl get deployments --all-namespaces=true -o wide"
 
 else
     echo_red "Cluster creation process failed!"
