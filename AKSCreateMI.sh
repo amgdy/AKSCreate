@@ -693,13 +693,6 @@ worker_command="az aks nodepool add ${workerpool_params[@]}"
 log "$worker_command"
 
 echo "Executing: $create_command" >&2
-
-if [ "$USER_NODE_COUNT" -gt 0 ]; then
-    echo_lightgreen "Adding User Node Pool to the cluster... "
-    echo "Executing: $worker_command" >&2
-    az aks nodepool add "${workerpool_params[@]}"
-fi
-
 az aks create "${cluster_params[@]}" "${network_params[@]}"
 
 if [ $? -eq 0 ]; then
