@@ -456,7 +456,7 @@ base_ip="10.0.0.0"
 recommended_cidr="$base_ip/$subnet_mask"
 
 # Display the recommended CIDR range
-echo_green "Based on the total required IP addresses ($RECOMMENDED_IPS), the recommended CIDR range is: $$subnet_mask or higher."
+echo_green "Based on the total required IP addresses ($RECOMMENDED_IPS), the recommended CIDR range is: /$subnet_mask or higher."
 
 echo_green "Cluster Network Connectivity"
 
