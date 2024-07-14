@@ -206,6 +206,7 @@ fi
 
 cluster_params+=(--generate-ssh-keys)
 cluster_params+=(--vm-set-type VirtualMachineScaleSets)
+cluster_params+=(--load-balancer-sku standard)
 
 echo_green "Cluster Name"
 CLUSTER_NAME=$(input_question "Kindly provide the desired name for the cluster")
@@ -318,9 +319,9 @@ done
 echo_green "Cluster Network Plugin"
 
 network_plugins=(
-    "[kubenet] Kubenet: Assigns a logically different IP address from the subnet to each pod for simpler setup (Linux Only)."
-    "[azure]   Azure CNI: Assigns a unique IP to each pod and node for advanced configurations (Linux & Windows)."
-    "[overlay] Azure CNI Overlay: Assigns IP addresses from a private CIDR logically different from the VNet to each pod (Linux & Windows). Offers better performance and Azure Network Policies support over kubenet."
+    "Azure CNI Overlay [overlay]: Assigns pod IP addresses from a private IP space. Best for scalability (Linux & Windows)."
+    "Azure CNI Node Subnet [azure]: Previously named Azure CNI. Assigns pod IP addresses from your host VNet. Best for workloads where pods must be reachable by other VNet resources (Linux & Windows)."
+    "Kubenet [kubenet]: Older, route table-based Overlay with limited scalability. Not recommended for most clusters (Linux Only)."
 )
 CLUSTER_NETWORK=$(select_item "Please select the desired cluster network configuration" "${network_plugins[@]}")
 
@@ -365,10 +366,26 @@ overlay)
     ;;
 esac
 
+network_policies=(
+    "[none]: Allow all ingress and egress traffic to the pods"
+    "[calico]: Open-source networking solution. Best for large-scale deployments with strict security requirements"
+    "[azure]: Native networking solution. Best for simpler deployments with basic security and networking requirements"
+)
+#NETWORK_POLICY=$(select_item "Please select the network policy for the cluster" "${network_policies[@]}")
+
 private_cluster=$(yes_no_question "Do you want to enable a private cluster to restrict worker node to API access for cluster: $CLUSTER_NAME?")
 if [ "$private_cluster" == 'y' ]; then
     cluster_params+=(--enable-private-cluster)
     echo_lightgreen "Private AKS clusters do not have their API server accessible from the public internet. To access the private cluster, deploy it into a virtual network that is accessible from your computer or follow the AKS private cluster documentation."
+fi
+
+# if private_cluster is enabled then ask to Disable a public FQDN
+if [ "$private_cluster" == 'y' ]; then
+    disable_public_fqdn=$(yes_no_question "Do you want to disable the public FQDN for the cluster: $CLUSTER_NAME?")
+    if [ "$disable_public_fqdn" == 'y' ]; then
+        cluster_params+=(--disable-public-fqdn)
+        echo_lightgreen "Public FQDN is disabled for the cluster."
+    fi
 fi
 
 echo_green "Retrieving tenant ID... "
@@ -437,6 +454,8 @@ echo_italic "System node pools VM Size has been set to $SYSTEM_NODE_SIZE"
 cluster_params+=(--node-vm-size "$SYSTEM_NODE_SIZE")
 
 echo_green "Configuring System Node Pool host OS"
+echo_lightgreen "Azure Linux on AKS offers a native, lightweight image built from validated source packages, designed specifically for Linux development in containers. It includes only essential packages, reducing the attack surface and eliminating the need for patching unnecessary packages. Its base layer features a Microsoft hardened kernel, optimized for Azure, ensuring secure and efficient container workloads."
+
 syspool_os_skus=(
     "Azure Linux [AzureLinux] - RECOMMENDED."
     "Ubuntu [ubuntu].")
@@ -539,10 +558,13 @@ cluster_params+=(--auto-upgrade-channel patch)
 
 echo_green "Pricing and SLA Tier for the Cluster"
 cluster_tiers=(
-    "Standard [standard] - This is the recommended option."
-    "Free [free] - Please note that this option does not include a financially backed API server uptime SLA."
+    "[Free]: The cluster management is free, but you'll be charged for VM, storage, and networking usage. Best for experimenting, learning, simple testing, or workloads with fewer than 10 nodes."
+    "[Standard]: Recommended for mission-critical and production workloads. Includes Kubernetes control plane autoscaling, workload-intensive testing, and up to 5,000 nodes per cluster. Uptime SLA is 99.95% for clusters using Availability Zones and 99.9% for clusters not using Availability Zones."
+    "[Premium]: Recommended for mission-critical and production workloads requiring TWO YEARS of support. Includes all current AKS features from standard tier."
 )
 CLUSTER_TIER=$(select_item "Please select the pricing tier for your cluster" "${cluster_tiers[@]}")
+# CLUSTER_TIER to lower case
+CLUSTER_TIER=$(echo "$CLUSTER_TIER" | tr '[:upper:]' '[:lower:]')
 log export CLUSTER_TIER="$CLUSTER_TIER"
 cluster_params+=(--tier "$CLUSTER_TIER")
 
@@ -577,9 +599,24 @@ if [ "$enable_kvsp" == 'y' ]; then
     cluster_params+=(--enable-addons azure-keyvault-secrets-provider)
 fi
 
+# add Managed NGINX ingress with the application routing add-on
+echo_green "Managed NGINX Ingress Controller offers in-cluster, scalable NGINX ingress controllers with basic load balancing and routing, internal/external load balancer setup, static IP configuration, Azure Key Vault and DNS Zones integration for certificate and DNS management, and supports the Ingress API."
+enable_ingress=$(yes_no_question "Would you like to enable the Managed NGINX Ingress Controller on $CLUSTER_NAME?")
+if [ "$enable_ingress" == 'y' ]; then
+    cluster_params+=(--enable-app-routing)
+fi
+
 enable_defender=$(yes_no_question "Would you like to enable the Microsoft Defender security profile on $CLUSTER_NAME?")
 if [ "$enable_defender" == 'y' ]; then
     cluster_params+=(--enable-defender)
+fi
+
+# Cost Management Your cluster must be either Standard or Premium tier, not the Free tier.
+if [ "$CLUSTER_TIER" != 'free' ]; then
+    enable_cost_management=$(yes_no_question "Would you like to enable Cost Management on $CLUSTER_NAME? (Must be Standard or Premium tier)")
+    if [ "$enable_cost_management" == 'y' ]; then
+        cluster_params+=(--enable-cost-analysis)
+    fi
 fi
 
 start_provision=$(yes_no_question "Are you ready to begin the provisioning process?")
