@@ -16,7 +16,7 @@ WINPOOL_NAME=winnp1
 TIMESTAMP=$(date +"%y%m%d-%H%M%S")
 vars_file="logs/vars-$TIMESTAMP.txt"
 
-pod_cidr='172.16.0.0/16'
+pod_cidr='172.16.0.0/'
 services_cidr='172.17.0.0/16'
 dns_service_ip='172.17.0.10'
 
@@ -433,31 +433,6 @@ else
     echo_red "User node pool configuration will be skipped."
 fi
 
-SYETEM_IP_COUNT=$(((SYSTEM_NODE_COUNT + 1) + ((SYSTEM_NODE_COUNT + 1) * system_nodes_max_pods)))
-USER_IP_COUNT=$(((USER_NODE_COUNT + 1) + ((USER_NODE_COUNT + 1) * user_nodes_max_pods)))
-RECOMMENDED_IPS=$((SYETEM_IP_COUNT + USER_IP_COUNT))
-
-# Display the informational message
-echo_green "The anticipated IP address count for the system node pool stands at: $SYETEM_IP_COUNT."
-echo_green "For the user node pool, the projected IP address count is: $USER_IP_COUNT."
-echo_green "Cumulatively, the cluster is expected to require: $((RECOMMENDED_IPS + 1)) IP addresses."
-
-# Assuming RECOMMENDED_IPS is already calculated
-total_ips_needed=$((RECOMMENDED_IPS + 1)) # Adding 1 for network address
-
-# Find the smallest subnet size that can accommodate the total IP count
-subnet_mask=32
-while [ $((2 ** (32 - subnet_mask))) -lt $total_ips_needed ]; do
-    ((subnet_mask--))
-done
-
-# Recommend a CIDR range
-base_ip="10.0.0.0"
-recommended_cidr="$base_ip/$subnet_mask"
-
-# Display the recommended CIDR range
-echo_green "Based on the total required IP addresses ($RECOMMENDED_IPS), the recommended CIDR range is: /$subnet_mask or higher."
-
 echo_green "Cluster Network Connectivity"
 
 SUBNET_ID=
@@ -546,8 +521,35 @@ network_plugins=(
 CLUSTER_NETWORK=$(select_item "Please select the desired cluster network configuration" "${network_plugins[@]}")
 
 if [ "$CLUSTER_NETWORK" == 'kubenet' ] || [ "$CLUSTER_NETWORK" == 'overlay' ]; then
+
+    SYETEM_IP_COUNT=$(((SYSTEM_NODE_COUNT + 1) + ((SYSTEM_NODE_COUNT + 1) * system_nodes_max_pods)))
+    USER_IP_COUNT=$(((USER_NODE_COUNT + 1) + ((USER_NODE_COUNT + 1) * user_nodes_max_pods)))
+    RECOMMENDED_IPS=$((SYETEM_IP_COUNT + USER_IP_COUNT))
+
+    # Assuming RECOMMENDED_IPS is already calculated
+    total_ips_needed=$((RECOMMENDED_IPS + 1)) # Adding 1 for network address
+
+    # Find the smallest subnet size that can accommodate the total IP count
+    subnet_mask=32
+    while [ $((2 ** (32 - subnet_mask))) -lt $total_ips_needed ]; do
+        ((subnet_mask--))
+    done
+
+    # Recommend a CIDR range
+    base_ip="10.0.0.0"
+    recommended_cidr="$base_ip/$subnet_mask"
+
     echo_green "Cluster Pods CIDR: A CIDR notation IP range from which each pod will be assigned a unique IP address."
-    POD_CIDR=$(input_question "Please provide the pods CIDR to use (Example: ${pod_cidr})")
+
+    # Display the informational message
+    echo_green "The anticipated IP address count for the system node pool stands at: $SYETEM_IP_COUNT."
+    echo_green "For the user node pool, the projected IP address count is: $USER_IP_COUNT."
+    echo_green "Cumulatively, the cluster is expected to require: $((RECOMMENDED_IPS + 1)) IP addresses."
+
+    # Display the recommended CIDR range
+    echo_cyan "Based on the total required IP addresses ($RECOMMENDED_IPS), the recommended PODs CIDR range is: /$subnet_mask or higher."
+
+    POD_CIDR=$(input_question "Please provide the pods CIDR to use (Example: ${pod_cidr}$subnet_mask)")
     log export POD_CIDR="$POD_CIDR"
 fi
 
