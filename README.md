@@ -1,4 +1,4 @@
-
+mkdir AKSScripts
 cd AKSScripts
 
 wget https://raw.githubusercontent.com/mohaom/AKSCreate/main/AKSInit.sh
